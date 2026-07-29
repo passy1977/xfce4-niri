@@ -1,0 +1,24 @@
+[package]
+name = "xfce-niri-service"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85.0"
+authors = ["Antonio Salsi"]
+description = "Utility to better integrate Xfce4 applications with the WM niri"
+license = "LGPL-2.1-or-later"
+repository = "https://github.com/passy1977/xfce-niri"
+homepage = "https://github.com/passy1977/xfce-niri"
+documentation = "https://docs.rs/xfce-niri"
+readme = "../README.md"
+keywords = ["niri", "xfce4", "embedded", "posix"]
+
+exclude = [
+    "target/",
+    ".git/",
+    ".github/",
+    "*.swp",
+    "*.swo",
+]
+
+[dependencies]
+osal-rs = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["posix", "serde", "async"]}

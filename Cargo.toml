@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+
+members = [
+    "xfce-niri-service"
+]
+
+
+[profile.release]
+codegen-units = 1 # better optimizations
+debug = false # symbols are nice and they don't increase the size on Flash
+lto = true # better optimizations
