@@ -20,6 +20,8 @@
 
 use osal_rs::os::{System, SystemFn as _};
 
+use crate::data::Data;
+
 
 mod brightness;
 mod data;
@@ -29,6 +31,8 @@ extern crate osal_rs;
 
 fn main() {
     println!("Hello, world!");
+
+    Data::share();
 
     System::start();
 }

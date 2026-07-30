@@ -62,12 +62,12 @@ pub(crate) fn open_log(option: c_int) {
     }
 }
 
-pub(crate) fn syslog(priority: c_int, msg: &str) {
+pub(crate) fn sys_log(priority: Priority, msg: &str) {
     let Ok(msg) = CString::new(msg) else {
         return;
     };
     unsafe {
-        ffi::syslog(priority, c"%s".as_ptr(), msg.as_ptr());
+        ffi::syslog(priority as c_int, c"%s".as_ptr(), msg.as_ptr());
     }
 }
 

@@ -18,17 +18,23 @@
  *
  ***************************************************************************/
 
-use std::{env, ffi::c_int};
+use std::env;
+use std::ffi::c_int;
+1
+use crate::os::syslog::{Options, Priority, close_log, open_log, sys_log};
 
-use osal_rs::os::Mutex;
-
-use crate::os::syslog::{Options, close_log, open_log};
 
 static mut DATA: Option<Data> = None;
+const NIRI_CONFIG_FILE: &str = ".config/niri/config.kdl";
+const NIRI_CONFIG_D_FOLDER: &str = ".config/niri.d";
+const BRIGHTNESS_FILE: &str = "/.local/state/niri-brightness";
+
 
 #[derive(Default, Clone)]
 pub(crate) struct Data {
-    niri_folder: String,
+    user_home: String,
+    niri_file: String,
+    niri_d_folder: String,
     brightness_file: String
 }
 
@@ -36,49 +42,59 @@ pub(crate) struct Data {
 impl Data {
     pub(crate) const fn new() -> Self {
         Self { 
-            niri_folder: String::new(),
+            user_home: String::new(),
+            niri_file: String::new(),
+            niri_d_folder: String::new(),
             brightness_file: String::new()
         }
     }
 
-    pub(crate) fn share() -> &'static Self {
+    pub(crate) fn share() -> Self {
 
         let data = unsafe {
             &mut *&raw mut DATA   
         };
 
-
-        
         match data {
             None => {
-                unsafe {
-                    (*&raw mut DATA) = Some(Data::new())
-                };
-
-                let data = unsafe {
-                    (*&raw mut DATA).as_ref().unwrap()
-                };
-
+            
                 let home = match env::var("HOME") {
                     Ok(home) => home,
                     Err(_) => {
 
+                        let error = "No HOME environment variable is set.";
 
                         open_log(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
-
+                        sys_log(Priority::LogCrit, error);
 
                         close_log();
 
-                        panic!("");
+                        panic!("{error}");
                     }
+                };
+
+                let mut data = Self { 
+                    user_home: home.clone(), 
+                    niri_file: home.clone(), 
+                    niri_d_folder: home.clone(), 
+                    brightness_file: home.clone() 
+                };
+
+                data.niri_file.push_str(NIRI_CONFIG_FILE);
+                data.niri_d_folder.push_str(NIRI_CONFIG_D_FOLDER);
+                data.brightness_file.push_str(BRIGHTNESS_FILE);
+            
+                unsafe {
+                    (*&raw mut DATA) = Some(data.clone())
                 };
 
                 data
             },
-            Some(data) => data,
+            Some(data) => data.clone(),
             
         }
+
     }
 
 }
