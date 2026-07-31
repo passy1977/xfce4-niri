@@ -20,8 +20,7 @@
 
 use std::ffi::{c_int, CStr, CString};
 
-const APP_TAG: &CStr = c"xfce-niri-service";
-
+#[allow(unused)]
 pub(crate) enum Options {
 
     LogPid = 0x01,
@@ -34,6 +33,7 @@ enum Facility {
     LogUser = 1 << 3
 }
 
+#[allow(unused)]
 pub(crate) enum Priority {
     LogEmerg = 0,
     LogAlert = 1,
@@ -55,25 +55,53 @@ pub(super)  mod ffi {
     }
 }
 
+pub(crate) struct SysLog;
 
-pub(crate) fn open_log(option: c_int) {
-    unsafe {
-        ffi::openlog(APP_TAG.as_ptr(), option, Facility::LogUser as c_int);
+impl Drop for SysLog {
+    fn drop(&mut self) {
+        self.close();
     }
 }
 
-pub(crate) fn sys_log(priority: Priority, msg: &str) {
-    let Ok(msg) = CString::new(msg) else {
-        return;
-    };
-    unsafe {
-        ffi::syslog(priority as c_int, c"%s".as_ptr(), msg.as_ptr());
+impl SysLog {
+
+    const APP_TAG: &CStr = c"xfce-niri-service";
+
+    pub(crate) fn open(option: c_int) -> Self {
+        unsafe {
+            ffi::openlog(Self::APP_TAG.as_ptr(), option, Facility::LogUser as c_int);
+        }
+        Self
+    }
+
+    pub(crate) fn syslog(&self, priority: Priority, msg: &str) {
+        let Ok(msg) = CString::new(msg) else {
+            return;
+        };
+        unsafe {
+            ffi::syslog(priority as c_int, c"%s".as_ptr(), msg.as_ptr());
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn syslog_with_tag(&self, tag: &str, priority: Priority, msg: &str) {
+        let Ok(tag) = CString::new(tag) else {
+            return;
+        }; 
+
+        let Ok(msg) = CString::new(msg) else {
+            return;
+        };
+
+        unsafe {
+            ffi::syslog(priority as c_int, c"%s - %s".as_ptr(), tag.as_ptr(), msg.as_ptr());
+        }
+    }
+
+
+    pub(crate) fn close(&mut self) {
+        unsafe {
+            ffi::closelog();
+        }
     }
 }
-
-pub(crate) fn close_log() {
-    unsafe {
-        ffi::closelog();
-    }
-}
-

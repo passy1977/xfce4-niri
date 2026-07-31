@@ -18,10 +18,76 @@
  *
  ***************************************************************************/
 
-pub(crate) struct Brightness;
+use std::fs;
+use std::num::ParseIntError;
+use std::path::PathBuf;
+use std::time::Duration;
+
+use osal_rs::os::{System, Thread, ThreadFn};
+use osal_rs::utils::{Error, Result};
+
+use crate::data::Data;
+
+#[allow(unused)]
+pub(crate) struct Brightness {
+    thread: Thread
+}
 
 impl Brightness {
 
 
+    pub(super) fn new() -> Self {
+        Self {
+            thread: Thread::new("brightness_thd", 0, 0),
+        }
+    }
+
+    pub(super) fn start(&mut self) -> Result<()>{
+
+        self.thread.spawn(None, |_, _| {
+
+            let devices = Data::read_directory("/sys/class/backlight")?;
+            let Some(device) = devices.iter().next() else {
+                return Err(Error::Unhandled("Brightness device not found"))
+            };
+
+            let brightness_path = device.path().join("brightness");
+
+
+            loop {
+
+                let actual_brightness_value = Self::read_brightness(&brightness_path)?;
+
+                println!("actual_brightness_value:{actual_brightness_value}");
+
+                System::delay_with_to_tick(Duration::from_secs(1));
+            }
+
+        })?;
+
+        Ok(())
+    }
+
+    fn read_brightness(brightness_path: &PathBuf) -> Result<i32> {
+
+        let brightness_path = fs::read_to_string(&brightness_path).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        
+        Ok(
+            brightness_path
+            .trim()
+            .parse()
+            .map_err(
+                |e: ParseIntError| Error::UnhandledOwned(e.to_string()) 
+            )?
+        )
+    }
+
+
+    fn write_brightness(brightness_path: &PathBuf, value: i32) -> Result<()> {
+
+        let brightness_path = fs::read_to_string(&brightness_path).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        
+        Ok(())
+    }
 
 }

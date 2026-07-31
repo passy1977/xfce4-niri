@@ -18,9 +18,11 @@
  *
  ***************************************************************************/
 
-use osal_rs::os::{System, SystemFn as _};
+use std::ffi::c_int;
 
-use crate::data::Data;
+use osal_rs::os::{System, SystemFn};
+
+use crate::{brightness::Brightness, data::Data, os::syslog::{Options, Priority, SysLog}};
 
 
 mod brightness;
@@ -30,9 +32,20 @@ mod os;
 extern crate osal_rs;
 
 fn main() {
-    println!("Hello, world!");
 
-    Data::share();
+    let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
+
+    if let Err(e) = Data::share().check_persistence() {
+        log.syslog(Priority::LogCrit, &e);
+        panic!("{e}");
+    }
+
+    if let Err(e) = Brightness::new().start() {
+        log.syslog(Priority::LogCrit, &e.to_string());
+        panic!("{e}");
+    }
+
+
 
     System::start();
 }
