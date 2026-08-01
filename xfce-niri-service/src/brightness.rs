@@ -18,6 +18,7 @@
  *
  ***************************************************************************/
 
+use std::ffi::c_int;
 use std::fs;
 use std::num::ParseIntError;
 use std::path::PathBuf;
@@ -29,6 +30,7 @@ use osal_rs::utils::{Error, Result};
 use osal_rs_serde::{Deserialize, Serialize};
 
 use crate::data::Data;
+use crate::os::syslog::{Options, Priority, SysLog};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct BrightnessData {
@@ -53,6 +55,7 @@ pub(crate) struct Brightness {
 
 impl Brightness {
 
+    const APP_TAG: &str = "Brightness";
 
     pub(super) fn new() -> Self {
         Self {
@@ -67,6 +70,9 @@ impl Brightness {
         let param: Option<ThreadParam> = Option::Some(self.current_brightness.clone());
 
         self.thread.spawn(param, |_, param| {
+
+            let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
+
 
             let devices = Data::read_directory("/sys/class/backlight")?;
             let Some(device) = devices.iter().next() else {
@@ -90,7 +96,11 @@ impl Brightness {
             let data: Box<BrightnessData> = Data::share().read_brightness()?;
             if data.value > 0 {
                 *current_brightness_ref = data.value;
-                Self::set_brightness(&brightness_path, data)?;
+                let Err(_) = Self::set_brightness(&brightness_path, data) else {
+                    log.syslog_with_tag(Self::APP_TAG, Priority::LogWarning, &format!("No found device: {}", &brightness_path.to_string_lossy()));
+                    return Ok(Arc::new(()))
+                };
+                log.syslog_with_tag(Self::APP_TAG, Priority::LogInfo, &format!("Found device: {}", &brightness_path.to_string_lossy()));
             } else {
                 *current_brightness_ref = 0;
                 drop(data)
@@ -134,7 +144,7 @@ impl Brightness {
         if brightness_path.to_string_lossy() != value.device {
             return Ok(())
         }
-        
+
         fs::write(brightness_path, value.value.to_le_bytes()).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
         Ok(())
     }
