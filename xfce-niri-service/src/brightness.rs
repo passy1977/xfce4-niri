@@ -21,17 +21,35 @@
 use std::fs;
 use std::num::ParseIntError;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 
-use osal_rs::os::{System, Thread, ThreadFn};
+use osal_rs::os::{Mutex, MutexFn, System, Thread, ThreadFn, ThreadParam};
 use osal_rs::utils::{Error, Result};
+use osal_rs_serde::{Deserialize, Serialize};
 
 use crate::data::Data;
 
-#[allow(unused)]
-pub(crate) struct Brightness {
-    thread: Thread
+#[derive(Clone, Serialize, Deserialize)]
+pub(crate) struct BrightnessData {
+    device: String,
+    value: i32
 }
+
+impl Default for BrightnessData {
+    fn default() -> Self {
+        Self { device: Default::default(), value: -2 }
+    }
+}
+
+#[allow(unused)]
+#[derive(Clone)]
+pub(crate) struct Brightness {
+    thread: Thread,
+    current_brightness: Arc<Mutex<i32>>,
+    device: Option<String>
+}
+
 
 impl Brightness {
 
@@ -39,12 +57,16 @@ impl Brightness {
     pub(super) fn new() -> Self {
         Self {
             thread: Thread::new("brightness_thd", 0, 0),
+            current_brightness: Mutex::new_arc(-1),
+            device: None
         }
     }
 
     pub(super) fn start(&mut self) -> Result<()>{
 
-        self.thread.spawn(None, |_, _| {
+        let param: Option<ThreadParam> = Option::Some(self.current_brightness.clone());
+
+        self.thread.spawn(param, |_, param| {
 
             let devices = Data::read_directory("/sys/class/backlight")?;
             let Some(device) = devices.iter().next() else {
@@ -54,12 +76,38 @@ impl Brightness {
             let brightness_path = device.path().join("brightness");
 
 
+            let current_brightness = param
+                .and_then(|p| p.downcast::<Mutex<i32>>().ok())
+                .ok_or(Error::Unhandled("Missing current_brightness parameter"))?;
+
+
+            
+            let mut binding = current_brightness.lock();
+            let Ok(current_brightness_ref) = binding.as_deref_mut() else {
+                return Err(Error::Unhandled("Missing current_brightness parameter"))
+            };
+
+            let data: Box<BrightnessData> = Data::share().read_brightness()?;
+            if data.value > 0 {
+                *current_brightness_ref = data.value;
+                Self::set_brightness(&brightness_path, data)?;
+            } else {
+                *current_brightness_ref = 0;
+                drop(data)
+            }
+            
             loop {
 
-                let actual_brightness_value = Self::read_brightness(&brightness_path)?;
+                let value = Self::get_brightness(&brightness_path)?;
 
-                println!("actual_brightness_value:{actual_brightness_value}");
-
+                if *current_brightness_ref != value {
+                    *current_brightness_ref =  value;
+                    Data::share().write_brightness(BrightnessData { 
+                        device: brightness_path.to_string_lossy().to_string(), 
+                        value
+                    })?;
+                }
+                
                 System::delay_with_to_tick(Duration::from_secs(1));
             }
 
@@ -68,7 +116,7 @@ impl Brightness {
         Ok(())
     }
 
-    fn read_brightness(brightness_path: &PathBuf) -> Result<i32> {
+    fn get_brightness(brightness_path: &PathBuf) -> Result<i32> {
 
         let brightness_path = fs::read_to_string(&brightness_path).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
         
@@ -82,11 +130,12 @@ impl Brightness {
         )
     }
 
-
-    fn write_brightness(brightness_path: &PathBuf, value: i32) -> Result<()> {
-
-        let brightness_path = fs::read_to_string(&brightness_path).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+    fn set_brightness(brightness_path: &PathBuf, value: Box<BrightnessData>) -> Result<()> {
+        if brightness_path.to_string_lossy() != value.device {
+            return Ok(())
+        }
         
+        fs::write(brightness_path, value.value.to_le_bytes()).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
         Ok(())
     }
 

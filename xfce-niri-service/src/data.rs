@@ -18,20 +18,34 @@
  *
  ***************************************************************************/
 
-use std::fs::DirEntry;
+use std::fs::{DirEntry, File};
+use std::io::{Read, Write};
 use std::{fs, path::Path};
 use std::env;
 use std::str::FromStr;
 use std::ffi::c_int;
 
 use osal_rs::utils::{Error, Result};
+use osal_rs_serde::{Deserialize, Serialize};
 
+use crate::brightness::BrightnessData;
 use crate::os::syslog::{Options, Priority, SysLog};
 
 
 static mut DATA: Option<Data> = None;
 pub(crate) const XDG_AUTOSTART: &str = "/etc/xdg/autostart";
 
+macro_rules! get_env_full_path {
+    ($home:expr, $env_var:literal, $real_path:literal) => {{
+        let mut home_tmp = $home.clone();
+        let var = env::var($env_var).unwrap_or_else(move |_| {
+            home_tmp.push_str($real_path);
+            home_tmp.to_string()
+        });
+
+        format!("{}/", var)
+    }};
+}
 
 
 #[derive(Default, Clone)]
@@ -48,6 +62,7 @@ pub(crate) struct Data {
 impl Data {
 
     const APP_TAG: &str = "Data";
+    const IO_BUFFER_SIZE: usize = 256;
 
     pub(crate) fn share() -> &'static Self {
 
@@ -71,20 +86,33 @@ impl Data {
                         panic!("{error}");
                     }
                 };
+                
+                let mut local = home.clone();
+                local.push_str("/.local/");
 
-                let mut data = Self { 
-                    user_home: home.clone(), 
-                    niri_file: home.clone(), 
-                    niri_d_folder: home.clone(), 
-                    xdg_home_autostart: home.clone(), 
-                    brightness_file: home.clone() 
+                let config = get_env_full_path!(home, "XDG_CONFIG_HOME", "/.config");
+                let state = get_env_full_path!(home, "XDG_STATE_HOME", "/.local/state");
+
+                let mut niri_file = config.clone();
+                niri_file.push_str("niri/config.kdl");
+
+                let mut niri_d_folder = config.clone();
+                niri_d_folder.push_str("niri/niri.d");
+
+                let mut xdg_home_autostart = local.clone();
+                xdg_home_autostart.push_str("share/autostart");
+
+                let mut brightness_file = state;
+                brightness_file.push_str("xfce_niri_brightness");
+
+                let data = Self { 
+                    user_home: home, 
+                    niri_file, 
+                    niri_d_folder, 
+                    xdg_home_autostart, 
+                    brightness_file 
                 };
 
-                data.niri_file.push_str("/.config/niri/config.kdl");
-                data.niri_d_folder.push_str("/.config/niri/niri.d");
-                data.xdg_home_autostart.push_str("/.config/autostart/");
-                data.brightness_file.push_str("/.local/state");
-            
                 unsafe {
                     (*&raw mut DATA) = Some(data)
                 };
@@ -140,6 +168,83 @@ impl Data {
         Ok(ret)
     }
 
+    fn write_file(file: &String, value: &impl Serialize) -> Result<()> {
+        let full_path = Path::new(file);
+
+        let Some(parent) = full_path.parent() else {
+            let msg = format!("Strange! The file no has parent: {file}", file = full_path.display());
+            return Err(Error::UnhandledOwned(msg))
+        };
+
+        if !parent.exists() {
+            let msg = format!("Folder not exist: {}", parent.display());
+            return Err(Error::UnhandledOwned(msg))
+        }
+
+        if full_path.is_dir() {
+            let msg = format!("This is a folder: {}", full_path.display());
+            return Err(Error::UnhandledOwned(msg))
+        }
+
+        let mut buffer= [0u8; Self::IO_BUFFER_SIZE];
+        let len_conversion = osal_rs_serde::to_bytes(value, &mut buffer).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        if len_conversion == 0 {
+            return Err(Error::WriteError("Invalid binary conversion"))
+        }
+        
+        let mut file = File::create(file).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let len_written = file.write(&buffer[0 .. len_conversion]).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+
+        if len_conversion != len_written {
+            return Err(Error::WriteError("Invalid binary conversion"))
+        }
+
+        Ok(())
+    }
+
+
+    fn read_file<T>(file: &String) -> Result<Box<T>>
+        where T: Deserialize + Default
+    {
+        let full_path = Path::new(file);
+
+        let Some(parent) = full_path.parent() else {
+            let msg = format!("Strange! The file no has parent: {file}", file = full_path.display());
+            return Err(Error::UnhandledOwned(msg))
+        };
+
+        if !parent.exists() {
+            let msg = format!("Folder not exist: {}", parent.display());
+            return Err(Error::UnhandledOwned(msg))
+        }
+
+        if full_path.is_dir() {
+            let msg = format!("This is a folder: {}", full_path.display());
+            return Err(Error::UnhandledOwned(msg))
+        }
+
+        if !full_path.exists() {
+            return Ok(Box::new(T::default()))
+        }
+        
+        let mut file = File::open(file).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let mut buffer= [0u8; Self::IO_BUFFER_SIZE];
+
+        file.read(&mut buffer).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+
+        let value: T = osal_rs_serde::from_bytes(&mut buffer).map_err(|_| Error::ReadError("Impossible read file"))?;
+
+        Ok(Box::new(value))
+    }
+
+    #[inline]
+    pub(crate) fn write_brightness(&self, value: BrightnessData) -> Result<()> {
+        Self::write_file(&self.brightness_file, &value)
+    }
+
+    pub(crate) fn read_brightness(&self) -> Result<Box<BrightnessData>>  {
+        Self::read_file::<BrightnessData>(&self.brightness_file)
+    }
     
 
 }
