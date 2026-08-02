@@ -80,6 +80,8 @@ fn walk(conn: &Connection, dest: &str, path: &str, depth: usize) -> Result<(), B
     let (xml,): (String,) =
         proxy.method_call("org.freedesktop.DBus.Introspectable", "Introspect", ())?;
 
+    println!("--- Start introspection of {path} ---\n{xml}\n--- End introspection\n");
+
     let indent = "  ".repeat(depth);
     println!("{indent}{path}");
     for iface in extract_attrs(&xml, "<interface name=\"") {
@@ -106,14 +108,14 @@ fn walk(conn: &Connection, dest: &str, path: &str, depth: usize) -> Result<(), B
 /// `GetAllProperties` call `xfconf-query -c <channel> -l` uses internally.
 fn print_xfconf_channels(conn: &Connection) -> Result<(), Box<dyn Error>> {
     let xfconf = conn.with_proxy("org.xfce.Xfconf", "/org/xfce/Xfconf", TIMEOUT);
+
     let (mut channels,): (Vec<String>,) =
         xfconf.method_call("org.xfce.Xfconf", "ListChannels", ())?;
     channels.sort();
 
     println!("=== org.xfce.Xfconf channels (settings, not separate D-Bus interfaces) ===");
     for channel in channels {
-        let result: Result<(PropMap,), _> =
-            xfconf.method_call("org.xfce.Xfconf", "GetAllProperties", (&channel, "/"));
+        let result: Result<(PropMap,), _> = xfconf.method_call("org.xfce.Xfconf", "GetAllProperties", (&channel, "/"));
         match result {
             Ok((props,)) => {
                 println!("  [{channel}] ({} properties)", props.len());
@@ -152,8 +154,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!();
     }
 
-    if names.iter().any(|n| n == "org.xfce.Xfconf") {
-        print_xfconf_channels(&conn)?;
+    if let Err(e) = print_xfconf_channels(&conn) {
+        println!("  (org.xfce.Xfconf not available: {e})");
     }
 
     Ok(())

@@ -18,32 +18,86 @@
  *
  ***************************************************************************/
 
+use std::ffi::c_int;
+use std::sync::Arc;
 use std::time::Duration;
 
-use dbus::blocking::Connection;
-use osal_rs::utils::{Error, Result};
 
- pub(crate) struct DBus(Connection);
+use dbus::Message;
+use dbus::arg::{self, RefArg, Variant};
+use dbus::blocking::Connection;
+use dbus::message::SignalArgs;
+use osal_rs::{os::{Mutex, MutexFn}, utils::{Error, Result}};
+
+use crate::os::syslog::{Options, Priority, SysLog};
+
+#[derive(Debug)]
+struct XfconfPropertyChanged {
+    channel: String,
+    property: String,
+    value: Variant<Box<dyn RefArg>>,
+}
+
+impl arg::ReadAll for XfconfPropertyChanged {
+    fn read(i: &mut arg::Iter) -> Result<Self, arg::TypeMismatchError> {
+        Ok(XfconfPropertyChanged {
+            channel: i.read()?,
+            property: i.read()?,
+            value: i.read()?,
+        })
+    }
+}
+
+impl SignalArgs for XfconfPropertyChanged {
+    const NAME: &'static str = "PropertyChanged";
+    const INTERFACE: &'static str = "org.xfce.Xfconf";
+}
+
+pub(crate) struct DBus(Connection, SysLog);
 
  impl DBus {
 
     const TIMEOUT: Duration = Duration::from_millis(5000);
-    // pub(crate) const DEST: &str = "org.xfce.Xfconf";
-    // pub(crate) const PATH: &str = "/org/xfce/Xfconf";
     const DEST: &str = "org.xfce.Xfconf";
     const PATH: &str = "/org/xfce/Xfconf";
 
 
-    pub(crate) fn connection() -> Result<Self> {
-
-
-        let conn = Connection::new_session().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-
-        let xfconf = conn.with_proxy(Self::DEST, Self::DEST, Self::TIMEOUT);
-
-
-
-        Ok(Self(conn))
+    pub(crate) fn new() -> Result<Self> {
+        
+        Ok(Self(
+            Connection::new_session().map_err(|e| Error::UnhandledOwned(e.to_string()))?,
+            SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int)    
+        ))
     }
 
+    pub(crate) fn register_signal(&self, channel: &str, property: &str, on_presentation_mode: Arc<Mutex<impl FnMut(bool) + Send + 'static>>) -> Result<()> {
+
+        let signal_property: String = format!("/{channel}{property}");
+
+        let xfconf = self.0.with_proxy(Self::DEST, Self::PATH, Self::TIMEOUT);
+
+        let initial: bool = match xfconf.method_call("org.xfce.Xfconf", "GetProperty", (channel, property)) {
+            Ok((value,)) => value,
+            Err(e) => {
+                let msg = format!("[{channel}]{property} not set yet ({e})");
+                self.1.syslog(Priority::LogWarning, &msg);
+                false
+            }
+        };
+        (on_presentation_mode.lock().unwrap())(initial);
+
+
+        let on_presentation_mode = on_presentation_mode.clone();
+        let channel = channel.to_owned();
+
+        xfconf.match_signal(move |signal: XfconfPropertyChanged, _: &Connection, _: &Message| {
+            
+            if signal.channel == channel && signal.property == signal_property {
+                (on_presentation_mode.lock().unwrap())(initial);
+            }
+            true
+        }).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+
+        Ok(())
+    }
  }

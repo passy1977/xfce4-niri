@@ -20,54 +20,49 @@
 
 use std::ffi::c_int;
 use std::sync::Arc;
-use std::time::Duration;
 
-use dbus::blocking::Connection;
-use osal_rs::os::{Mutex, MutexFn, System, Thread, ThreadFn, ThreadParam};
-use osal_rs::utils::{Error, Result};
+use osal_rs::os::{Mutex, MutexFn};
+use osal_rs::utils::Result;
 
 use crate::dbus::DBus;
 use crate::os::syslog::{Options, SysLog};
 
- pub(crate) struct LockScreen {
-    thread: Thread,
+
+pub(crate) struct LockScreen {
     presentation_mode: Arc<Mutex<bool>>,
  }
 
- impl LockScreen {
+impl LockScreen {
+
+    const CHANNEL: &str = "xfce4-power-manager";
+    const PROPERTY: &str = "/presentation-mode";
 
     pub(crate) fn new() -> Self {
         Self {
-            thread: Thread::new("lock_screen_thd", 0, 0),
             presentation_mode: Mutex::new_arc(false),
         }
     }
 
-    pub(super) fn start(&mut self) -> Result<()> {
-
-        let param: Option<ThreadParam> = Option::Some(self.presentation_mode.clone());
-
-        self.thread.spawn(param, |_, param| {
-            let _log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
-
-            let presentation_mode = param
-                .and_then(|p| p.downcast::<Mutex<i32>>().ok())
-                .ok_or(Error::Unhandled("Missing presentation_mode parameter"))?;
-
-            let mut binding = presentation_mode.lock();
-            let Ok(_presentation_mode_ref) = binding.as_deref_mut() else {
-                return Err(Error::Unhandled("Missing presentation_mode parameter"))
-            };
+    pub(super) fn start(&mut self, dbus: &DBus) -> Result<()> {
 
 
-            loop {
+
+        let _log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
+
+        let self_presentation_mode = self.presentation_mode.clone();
+        
+        dbus.register_signal(Self::CHANNEL, Self::PROPERTY, Mutex::new_arc(
+            move |presentation_mode: bool| {
+
+                let Ok(self_presentation_mode_ref) = self_presentation_mode.lock() else {
+                    return
+                };
 
 
-                System::delay_with_to_tick(Duration::from_secs(1));
-            }
+                print!("presentation_mode:{presentation_mode} --> {}", *self_presentation_mode_ref);
+            })
 
-        })?;
-
+        )?;
 
         Ok(())
     }
