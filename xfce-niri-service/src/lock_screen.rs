@@ -59,7 +59,7 @@ impl LockScreen {
                 };
 
 
-                print!("presentation_mode:{presentation_mode} --> {}", *self_presentation_mode_ref);
+                println!("presentation_mode:{presentation_mode} --> {}", *self_presentation_mode_ref);
             })
 
         )?;

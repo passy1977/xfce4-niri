@@ -22,11 +22,11 @@ use std::ffi::c_int;
 use std::sync::Arc;
 use std::time::Duration;
 
-
 use dbus::Message;
 use dbus::arg::{self, RefArg, Variant};
-use dbus::blocking::Connection;
+use dbus::blocking::SyncConnection;
 use dbus::message::SignalArgs;
+use osal_rs::os::{Thread, ThreadFn};
 use osal_rs::{os::{Mutex, MutexFn}, utils::{Error, Result}};
 
 use crate::os::syslog::{Options, Priority, SysLog};
@@ -35,7 +35,7 @@ use crate::os::syslog::{Options, Priority, SysLog};
 struct XfconfPropertyChanged {
     channel: String,
     property: String,
-    value: Variant<Box<dyn RefArg>>,
+    _value: Variant<Box<dyn RefArg>>,
 }
 
 impl arg::ReadAll for XfconfPropertyChanged {
@@ -43,7 +43,7 @@ impl arg::ReadAll for XfconfPropertyChanged {
         Ok(XfconfPropertyChanged {
             channel: i.read()?,
             property: i.read()?,
-            value: i.read()?,
+            _value: i.read()?,
         })
     }
 }
@@ -53,7 +53,11 @@ impl SignalArgs for XfconfPropertyChanged {
     const INTERFACE: &'static str = "org.xfce.Xfconf";
 }
 
-pub(crate) struct DBus(Connection, SysLog);
+pub(crate) struct DBus {
+    thread: Thread, 
+    conn: Arc<SyncConnection>, 
+    log: SysLog
+}
 
  impl DBus {
 
@@ -63,24 +67,25 @@ pub(crate) struct DBus(Connection, SysLog);
 
 
     pub(crate) fn new() -> Result<Self> {
-        
-        Ok(Self(
-            Connection::new_session().map_err(|e| Error::UnhandledOwned(e.to_string()))?,
-            SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int)    
-        ))
+
+        Ok(Self{
+            thread: Thread::new("dbus_thd", 0, 0),
+            conn: Arc::new(SyncConnection::new_session().map_err(|e| Error::UnhandledOwned(e.to_string()))?),
+            log: SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int)
+        })
     }
 
     pub(crate) fn register_signal(&self, channel: &str, property: &str, on_presentation_mode: Arc<Mutex<impl FnMut(bool) + Send + 'static>>) -> Result<()> {
 
         let signal_property: String = format!("/{channel}{property}");
 
-        let xfconf = self.0.with_proxy(Self::DEST, Self::PATH, Self::TIMEOUT);
+        let xfconf = self.conn.with_proxy(Self::DEST, Self::PATH, Self::TIMEOUT);
 
         let initial: bool = match xfconf.method_call("org.xfce.Xfconf", "GetProperty", (channel, property)) {
             Ok((value,)) => value,
             Err(e) => {
                 let msg = format!("[{channel}]{property} not set yet ({e})");
-                self.1.syslog(Priority::LogWarning, &msg);
+                self.log.syslog(Priority::LogWarning, &msg);
                 false
             }
         };
@@ -90,13 +95,37 @@ pub(crate) struct DBus(Connection, SysLog);
         let on_presentation_mode = on_presentation_mode.clone();
         let channel = channel.to_owned();
 
-        xfconf.match_signal(move |signal: XfconfPropertyChanged, _: &Connection, _: &Message| {
-            
+        xfconf.match_signal(move |signal: XfconfPropertyChanged, _: &SyncConnection, _: &Message| {
+
             if signal.channel == channel && signal.property == signal_property {
                 (on_presentation_mode.lock().unwrap())(initial);
             }
             true
         }).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// Starts a dedicated thread that pumps the connection forever,
+    /// dispatching incoming signals to the callbacks registered via
+    /// `register_signal`. Without this nothing ever reads from the D-Bus
+    /// socket, so registered match rules never fire.
+    ///
+    /// The connection is shared through an `Arc<SyncConnection>`, so
+    /// `register_signal` can still be called on `self` after `start()` to
+    /// subscribe to further signals.
+    pub(crate) fn start(&mut self) -> Result<()> {
+
+        let connection = self.conn.clone();
+
+        self.thread.spawn(None,move |_, _| {
+                let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
+                loop {
+                    if let Err(e) = connection.process(Self::TIMEOUT) {
+                        log.syslog(Priority::LogWarning, &format!("dbus process error: {e}"));
+                    }
+                }
+            })?;
 
         Ok(())
     }

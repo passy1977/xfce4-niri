@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(msg.into());
     }
 
-    let dbus = match DBus::new() {
+    let mut dbus = match DBus::new() {
         Ok(dbus) => dbus,
         Err(e) => {
             let msg = e.to_string();
@@ -59,6 +59,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if let Err(e) = LockScreen::new().start(&dbus) {
+        let msg = e.to_string();
+        log.syslog(Priority::LogCrit, &msg);
+        return Err(msg.into());
+    }
+
+    if let Err(e) = dbus.start() {
         let msg = e.to_string();
         log.syslog(Priority::LogCrit, &msg);
         return Err(msg.into());

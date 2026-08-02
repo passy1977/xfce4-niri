@@ -67,7 +67,7 @@ impl Brightness {
 
     pub(super) fn start(&mut self) -> Result<()>{
 
-        let param: Option<ThreadParam> = Option::Some(self.current_brightness.clone());
+        let param: Option<ThreadParam> = Some(self.current_brightness.clone());
 
         self.thread.spawn(param, |_, param| {
 
