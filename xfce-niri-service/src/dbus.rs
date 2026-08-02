@@ -32,23 +32,23 @@ use osal_rs::{os::{Mutex, MutexFn}, utils::{Error, Result}};
 use crate::os::syslog::{Options, Priority, SysLog};
 
 #[derive(Debug)]
-struct XfconfPropertyChanged {
+struct XFConfPropertyChanged {
     channel: String,
     property: String,
-    _value: Variant<Box<dyn RefArg>>,
+    value: Variant<Box<dyn RefArg>>,
 }
 
-impl arg::ReadAll for XfconfPropertyChanged {
+impl arg::ReadAll for XFConfPropertyChanged {
     fn read(i: &mut arg::Iter) -> Result<Self, arg::TypeMismatchError> {
-        Ok(XfconfPropertyChanged {
+        Ok(XFConfPropertyChanged {
             channel: i.read()?,
             property: i.read()?,
-            _value: i.read()?,
+            value: i.read()?,
         })
     }
 }
 
-impl SignalArgs for XfconfPropertyChanged {
+impl SignalArgs for XFConfPropertyChanged {
     const NAME: &'static str = "PropertyChanged";
     const INTERFACE: &'static str = "org.xfce.Xfconf";
 }
@@ -75,18 +75,18 @@ pub(crate) struct DBus {
         })
     }
 
-    pub(crate) fn register_signal(&self, channel: &str, property: &str, on_presentation_mode: Arc<Mutex<impl FnMut(bool) + Send + 'static>>) -> Result<()> {
+    pub(crate) fn register_signal(&self, channel: &str, property: &str, on_presentation_mode: Arc<Mutex<impl FnMut(u64) + Send + 'static>>) -> Result<()> {
 
-        let signal_property: String = format!("/{channel}{property}");
+        let signal_property: String = property.to_owned();
 
         let xfconf = self.conn.with_proxy(Self::DEST, Self::PATH, Self::TIMEOUT);
-
-        let initial: bool = match xfconf.method_call("org.xfce.Xfconf", "GetProperty", (channel, property)) {
-            Ok((value,)) => value,
+        
+        let initial: u64 = match xfconf.method_call::<(Variant<Box<dyn RefArg>>,), _, _, _>("org.xfce.Xfconf", "GetProperty", (channel, property)) {
+            Ok((value,)) => value.0.as_u64().unwrap_or_default(),
             Err(e) => {
                 let msg = format!("[{channel}]{property} not set yet ({e})");
                 self.log.syslog(Priority::LogWarning, &msg);
-                false
+                0
             }
         };
         (on_presentation_mode.lock().unwrap())(initial);
@@ -95,10 +95,10 @@ pub(crate) struct DBus {
         let on_presentation_mode = on_presentation_mode.clone();
         let channel = channel.to_owned();
 
-        xfconf.match_signal(move |signal: XfconfPropertyChanged, _: &SyncConnection, _: &Message| {
+        xfconf.match_signal(move |signal: XFConfPropertyChanged, _: &SyncConnection, _: &Message| {
 
             if signal.channel == channel && signal.property == signal_property {
-                (on_presentation_mode.lock().unwrap())(initial);
+                (on_presentation_mode.lock().unwrap())(signal.value.0.as_u64().unwrap_or_default());
             }
             true
         }).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
@@ -116,12 +116,12 @@ pub(crate) struct DBus {
     /// subscribe to further signals.
     pub(crate) fn start(&mut self) -> Result<()> {
 
-        let connection = self.conn.clone();
+        let conn = self.conn.clone();
 
         self.thread.spawn(None,move |_, _| {
                 let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
                 loop {
-                    if let Err(e) = connection.process(Self::TIMEOUT) {
+                    if let Err(e) = conn.process(Self::TIMEOUT) {
                         log.syslog(Priority::LogWarning, &format!("dbus process error: {e}"));
                     }
                 }
