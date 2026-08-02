@@ -21,5 +21,7 @@ exclude = [
 ]
 
 [dependencies]
-osal-rs = { version = "1", features = ["posix", "serde", "async"]}
-osal-rs-serde = { version = "1", features = ["derive"]}
+osal-rs = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["posix", "serde", "async"]}
+osal-rs-serde = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["derive"]}
+cjson-bindings = { version = "0.6", features = ["std"]}
+dbus = "0.9.12"

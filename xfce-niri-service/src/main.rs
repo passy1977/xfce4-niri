@@ -18,34 +18,51 @@
  *
  ***************************************************************************/
 
-use std::ffi::c_int;
+use std::{error::Error, ffi::c_int};
 
 use osal_rs::os::{System, SystemFn};
 
-use crate::{brightness::Brightness, data::Data, os::syslog::{Options, Priority, SysLog}};
+use crate::{brightness::Brightness, data::Data, dbus::DBus, lock_screen::LockScreen, os::syslog::{Options, Priority, SysLog}};
 
 
 mod brightness;
 mod data;
+mod dbus;
+mod lock_screen;
 mod os;
 
 extern crate osal_rs;
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
 
     let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
     if let Err(e) = Data::share().check_persistence() {
-        log.syslog(Priority::LogCrit, &e);
-        panic!("{e}");
+        let msg = e.to_string();
+        log.syslog(Priority::LogCrit, &msg);
+        return Err(msg.into());
     }
+
+    // if let Err(e) = DBus::new().start() {
+    //     let msg = e.to_string();
+    //     log.syslog(Priority::LogCrit, &msg);
+    //     return Err(msg.into());
+    // }
+
 
     if let Err(e) = Brightness::new().start() {
-        log.syslog(Priority::LogCrit, &e.to_string());
-        panic!("{e}");
+        let msg = e.to_string();
+        log.syslog(Priority::LogCrit, &msg);
+        return Err(msg.into());
     }
 
-
+    if let Err(e) = LockScreen::new().start() {
+        let msg = e.to_string();
+        log.syslog(Priority::LogCrit, &msg);
+        return Err(msg.into());
+    }
 
     System::start();
+
+    Ok(())
 }
