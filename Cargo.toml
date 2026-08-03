@@ -2,7 +2,7 @@
 resolver = "3"
 
 members = [
-    "xfce-niri-service"
+    "xfce4-niri-service"
 ]
 
 

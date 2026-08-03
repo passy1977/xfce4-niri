@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- * xfce-niri
+ * xfce4-niri
  * Copyright (C) 2026 Antonio Salsi <passy.linux@zresa.it>
  *
  * This library is free software; you can redistribute it and/or

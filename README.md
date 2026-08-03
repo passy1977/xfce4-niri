@@ -1,4 +1,4 @@
-# xfce-niri-service
+# xfce4-niri-service
 Utility to better integrate Xfce4 applications with the WM niri
 
 ## Dependencies 

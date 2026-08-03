@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- * xfce-niri
+ * xfce4-niri
  * Copyright (C) 2026 Antonio Salsi <passy.linux@zresa.it>
  *
  * This library is free software; you can redistribute it and/or
@@ -103,7 +103,7 @@ impl Data {
                 xdg_home_autostart.push_str("share/autostart");
 
                 let mut brightness_file = state;
-                brightness_file.push_str("xfce_niri_brightness");
+                brightness_file.push_str("xfce4_niri_brightness");
 
                 let data = Self { 
                     user_home: home, 

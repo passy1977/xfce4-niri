@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- * xfce-niri
+ * xfce4-niri
  * Copyright (C) 2026 Antonio Salsi <passy.linux@zresa.it>
  *
  * This library is free software; you can redistribute it and/or
@@ -65,7 +65,7 @@ impl Drop for SysLog {
 
 impl SysLog {
 
-    const APP_TAG: &CStr = c"xfce-niri-service";
+    const APP_TAG: &CStr = c"xfce4-niri-service";
 
     pub(crate) fn open(option: c_int) -> Self {
         unsafe {
