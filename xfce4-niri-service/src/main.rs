@@ -21,8 +21,11 @@
 use std::{error::Error, ffi::c_int};
 
 use osal_rs::os::{System, SystemFn};
-
-use crate::{brightness::Brightness, data::Data, dbus::DBus, lock_screen::LockScreen, os::syslog::{Options, Priority, SysLog}};
+use crate::data::Data;
+use crate::dbus::DBus;
+use crate::brightness::Brightness;
+use crate::lock_screen::LockScreen;
+use crate::os::syslog::{Options, Priority, SysLog};
 
 
 mod brightness;
@@ -63,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         log.syslog(Priority::LogCrit, &msg);
         return Err(msg.into());
     }
-
+    
     if let Err(e) = dbus.start() {
         let msg = e.to_string();
         log.syslog(Priority::LogCrit, &msg);

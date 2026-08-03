@@ -53,6 +53,22 @@ impl SignalArgs for XFConfPropertyChanged {
     const INTERFACE: &'static str = "org.xfce.Xfconf";
 }
 
+trait FromRefArg: Sized {
+    fn from_refarg(value: &dyn RefArg) -> Option<Self>;
+}
+
+impl FromRefArg for u64 {
+    fn from_refarg(value: &dyn RefArg) -> Option<Self> {
+        value.as_u64()
+    }
+}
+
+impl FromRefArg for bool {
+    fn from_refarg(value: &dyn RefArg) -> Option<Self> {
+        value.as_u64().map(|v| v != 0)
+    }
+}
+
 pub(crate) struct DBus {
     thread: Thread, 
     conn: Arc<SyncConnection>, 
@@ -68,37 +84,44 @@ pub(crate) struct DBus {
 
     pub(crate) fn new() -> Result<Self> {
 
+        let conn = SyncConnection::new_session().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+
+        conn.set_signal_match_mode(true);
+
         Ok(Self{
             thread: Thread::new("dbus_thd", 0, 0),
-            conn: Arc::new(SyncConnection::new_session().map_err(|e| Error::UnhandledOwned(e.to_string()))?),
+            conn: Arc::new(conn),
             log: SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int)
         })
     }
 
-    pub(crate) fn register_signal(&self, channel: &str, property: &str, on_presentation_mode: Arc<Mutex<impl FnMut(u64) + Send + 'static>>) -> Result<()> {
+
+    fn register_signal<T: FromRefArg + Default>(&self, channel: &str, property: &str, on_change: Arc<Mutex<impl FnMut(T) + Send + 'static>>) -> Result<()> {
 
         let signal_property: String = property.to_owned();
 
         let xfconf = self.conn.with_proxy(Self::DEST, Self::PATH, Self::TIMEOUT);
-        
-        let initial: u64 = match xfconf.method_call::<(Variant<Box<dyn RefArg>>,), _, _, _>("org.xfce.Xfconf", "GetProperty", (channel, property)) {
-            Ok((value,)) => value.0.as_u64().unwrap_or_default(),
+
+        let initial: T = match xfconf.method_call::<(Variant<Box<dyn RefArg>>,), _, _, _>("org.xfce.Xfconf", "GetProperty", (channel, property)) {
+            Ok((value,)) => T::from_refarg(&*value.0).unwrap_or_default(),
             Err(e) => {
                 let msg = format!("[{channel}]{property} not set yet ({e})");
                 self.log.syslog(Priority::LogWarning, &msg);
-                0
+                T::default()
             }
         };
-        (on_presentation_mode.lock().unwrap())(initial);
+        (on_change.lock().unwrap())(initial);
 
 
-        let on_presentation_mode = on_presentation_mode.clone();
+        let on_change = on_change.clone();
         let channel = channel.to_owned();
 
         xfconf.match_signal(move |signal: XFConfPropertyChanged, _: &SyncConnection, _: &Message| {
 
             if signal.channel == channel && signal.property == signal_property {
-                (on_presentation_mode.lock().unwrap())(signal.value.0.as_u64().unwrap_or_default());
+                if let Some(value) = T::from_refarg(&*signal.value.0) {
+                    (on_change.lock().unwrap())(value);
+                }
             }
             true
         }).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
@@ -106,14 +129,26 @@ pub(crate) struct DBus {
         Ok(())
     }
 
-    /// Starts a dedicated thread that pumps the connection forever,
-    /// dispatching incoming signals to the callbacks registered via
-    /// `register_signal`. Without this nothing ever reads from the D-Bus
-    /// socket, so registered match rules never fire.
-    ///
-    /// The connection is shared through an `Arc<SyncConnection>`, so
-    /// `register_signal` can still be called on `self` after `start()` to
-    /// subscribe to further signals.
+    #[inline]
+    pub(crate) fn register_presentation_mode_signal(&self, channel: &str, property: &str, on_presentation_mode: Arc<Mutex<impl FnMut(u64) + Send + 'static>>) -> Result<()> {
+        self.register_signal(channel, property, on_presentation_mode)
+    }
+
+    #[inline]
+    pub(crate) fn register_dpms_on_ac_sleep_signal(&self, channel: &str, property: &str, on_dpms_on_ac_sleep: Arc<Mutex<impl FnMut(u64) + Send + 'static>>) -> Result<()> {
+        self.register_signal(channel, property, on_dpms_on_ac_sleep)
+    }
+
+    #[inline]
+    pub(crate) fn register_dpms_enabled_signal(&self, channel: &str, property: &str, on_dpms_enabled: Arc<Mutex<impl FnMut(bool) + Send + 'static>>) -> Result<()> {
+        self.register_signal( channel, property, on_dpms_enabled)
+    }
+
+    #[inline]
+    pub(crate) fn register_dpms_on_battery_off_signal(&self, channel: &str, property: &str, on_dpms_on_battery_off: Arc<Mutex<impl FnMut(u64) + Send + 'static>>) -> Result<()> {
+        self.register_signal(channel, property, on_dpms_on_battery_off)
+    }
+
     pub(crate) fn start(&mut self) -> Result<()> {
 
         let conn = self.conn.clone();
