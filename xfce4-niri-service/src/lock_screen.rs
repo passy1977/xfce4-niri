@@ -51,6 +51,20 @@ pub(crate) struct LockScreen {
     presentation_mode: Arc<Mutex<bool>>,
 }
 
+macro_rules! update_power_manager_data {
+    ($self_presentation_mode:expr, $field:ident) => {{
+        let Ok(self_presentation_mode_ref) = $self_presentation_mode.lock() else {
+            return
+        };
+
+        let mut guard = access_static_option!(POWER_MANAGER_DATA).lock();
+        let guard = guard.as_mut().unwrap();
+        guard.$field = $field;
+
+        access_static_option!(EVENT_GROUP).set((1 << *self_presentation_mode_ref as u8) as EventBits);
+    }};
+}
+
 impl LockScreen {
 
     const CHANNEL: &str = "xfce4-power-manager";
@@ -105,45 +119,25 @@ impl LockScreen {
         let self_presentation_mode = self.presentation_mode.clone();
         dbus.register_dpms_enabled_signal(Self::CHANNEL, Self::PROPERTY_DPMS_ENABLED, Mutex::new_arc(
             move |dpms_enabled| {
-
-            let Ok(self_presentation_mode_ref) = self_presentation_mode.lock() else {
-                return
-            };
-
-            let mut guard = access_static_option!(POWER_MANAGER_DATA).lock();
-            let guard =  guard.as_mut().unwrap();
-            guard.dpms_enabled = dpms_enabled;
-
-            access_static_option!(EVENT_GROUP).set((1 << *self_presentation_mode_ref as u8) as EventBits);
+                
+                update_power_manager_data!(self_presentation_mode, dpms_enabled);
+                
         }))?;
 
         let self_presentation_mode = self.presentation_mode.clone();
         dbus.register_dpms_on_ac_sleep_signal(Self::CHANNEL, Self::PROPERTY_DPMS_ON_AC_OFF, Mutex::new_arc(
             move |dpms_on_ac_off| {
-            let Ok(self_presentation_mode_ref) = self_presentation_mode.lock() else {
-                return
-            };
+                
+                update_power_manager_data!(self_presentation_mode, dpms_on_ac_off);
 
-
-            let mut guard = access_static_option!(POWER_MANAGER_DATA).lock();
-            let guard =  guard.as_mut().unwrap();
-            guard.dpms_on_ac_off = dpms_on_ac_off;
-
-            access_static_option!(EVENT_GROUP).set((1 << *self_presentation_mode_ref as u8) as EventBits);
         }))?;
 
         let self_presentation_mode = self.presentation_mode.clone();
         dbus.register_dpms_on_battery_off_signal(Self::CHANNEL, Self::PROPERTY_DPMS_ON_BATTERY_OFF, Mutex::new_arc(
             move |dpms_on_battery_off| {
-            let Ok(self_presentation_mode_ref) = self_presentation_mode.lock() else {
-                return
-            };
+                
+                update_power_manager_data!(self_presentation_mode, dpms_on_battery_off);
 
-            let mut guard = access_static_option!(POWER_MANAGER_DATA).lock();
-            let guard =  guard.as_mut().unwrap();
-            guard.dpms_on_battery_off = dpms_on_battery_off;
-
-            access_static_option!(EVENT_GROUP).set((1 << *self_presentation_mode_ref as u8) as EventBits);
         }))?;
 
         self.thread.spawn(None, |_, _| {
