@@ -63,11 +63,11 @@ impl FromRefArg for u64 {
     }
 }
 
-impl FromRefArg for bool {
-    fn from_refarg(value: &dyn RefArg) -> Option<Self> {
-        value.as_u64().map(|v| v != 0)
-    }
-}
+// impl FromRefArg for bool {
+//     fn from_refarg(value: &dyn RefArg) -> Option<Self> {
+//         value.as_u64().map(|v| v != 0)
+//     }
+// }
 
 pub(crate) struct DBus {
     thread: Thread, 
@@ -140,7 +140,7 @@ pub(crate) struct DBus {
     }
 
     #[inline]
-    pub(crate) fn register_dpms_enabled_signal(&self, channel: &str, property: &str, on_dpms_enabled: Arc<Mutex<impl FnMut(bool) + Send + 'static>>) -> Result<()> {
+    pub(crate) fn register_dpms_enabled_signal(&self, channel: &str, property: &str, on_dpms_enabled: Arc<Mutex<impl FnMut(u64) + Send + 'static>>) -> Result<()> {
         self.register_signal( channel, property, on_dpms_enabled)
     }
 
