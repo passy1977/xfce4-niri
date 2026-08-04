@@ -38,11 +38,12 @@ struct LockScreenData {
     dpms_enabled: u64,
     dpms_on_ac_off: u64,
     dpms_on_battery_off: u64,
+    has_battery: bool
 }
 
 impl Default for LockScreenData {
     fn default() -> Self {
-        Self { presentation_mode: Default::default(), dpms_enabled: Default::default(), dpms_on_ac_off: Default::default(), dpms_on_battery_off: Default::default() }
+        Self { presentation_mode: Default::default(), dpms_enabled: Default::default(), dpms_on_ac_off: Default::default(), dpms_on_battery_off: Default::default(), has_battery: Default::default() }
     }
 }
 

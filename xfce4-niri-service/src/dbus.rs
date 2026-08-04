@@ -130,24 +130,46 @@ pub(crate) struct DBus {
     }
 
     #[inline]
-    pub(crate) fn register_presentation_mode_signal(&self, channel: &str, property: &str, on_presentation_mode: Arc<Mutex<impl FnMut(u64) + Send + 'static>>) -> Result<()> {
+    pub(crate) fn register_presentation_mode_signal(
+        &self, 
+        channel: &str, 
+        property: &str, 
+        on_presentation_mode: Arc<Mutex<impl FnMut(u64) + Send + 'static>>
+    ) -> Result<()> {
         self.register_signal(channel, property, on_presentation_mode)
     }
 
     #[inline]
-    pub(crate) fn register_dpms_on_ac_sleep_signal(&self, channel: &str, property: &str, on_dpms_on_ac_sleep: Arc<Mutex<impl FnMut(u64) + Send + 'static>>) -> Result<()> {
+    pub(crate) fn register_dpms_on_ac_sleep_signal(
+        &self, 
+        channel: &str, 
+        property: &str, 
+        on_dpms_on_ac_sleep: Arc<Mutex<impl FnMut(u64) + Send + 'static>>
+    ) -> Result<()> {
         self.register_signal(channel, property, on_dpms_on_ac_sleep)
     }
 
     #[inline]
-    pub(crate) fn register_dpms_enabled_signal(&self, channel: &str, property: &str, on_dpms_enabled: Arc<Mutex<impl FnMut(u64) + Send + 'static>>) -> Result<()> {
+    pub(crate) fn register_dpms_enabled_signal(
+        &self, 
+        channel: &str, 
+        property: &str, 
+        on_dpms_enabled: Arc<Mutex<impl FnMut(u64) + Send + 'static>>
+    ) -> Result<()> {
         self.register_signal( channel, property, on_dpms_enabled)
     }
 
     #[inline]
-    pub(crate) fn register_dpms_on_battery_off_signal(&self, channel: &str, property: &str, on_dpms_on_battery_off: Arc<Mutex<impl FnMut(u64) + Send + 'static>>) -> Result<()> {
+    pub(crate) fn register_dpms_on_battery_off_signal(
+        &self, 
+        channel: &str, 
+        property: &str, 
+        on_dpms_on_battery_off: Arc<Mutex<impl FnMut(u64) + Send + 'static>>
+    ) -> Result<()> {
         self.register_signal(channel, property, on_dpms_on_battery_off)
     }
+
+
 
     pub(crate) fn start(&mut self) -> Result<()> {
 
