@@ -68,11 +68,16 @@ macro_rules! update_power_manager_data {
 
 impl LockScreen {
 
-    const CHANNEL: &str = "xfce4-power-manager";
-    const PROPERTY_PRESENTATION_MODE: &str = "/xfce4-power-manager/presentation-mode";
-    const PROPERTY_DPMS_ENABLED: &str = "/xfce4-power-manager/dpms-enabled";
-    const PROPERTY_DPMS_ON_AC_OFF: &str = "/xfce4-power-manager/dpms-on-ac-off";
-    const PROPERTY_DPMS_ON_BATTERY_OFF: &str = "/xfce4-power-manager/dpms-on-battery-off";
+    const XFCE4_PM_CHANNEL: &str = "xfce4-power-manager";
+    const XFCE4_PM_PROPERTY_PRESENTATION_MODE: &str = "/xfce4-power-manager/presentation-mode";
+    const XFCE4_PM_PROPERTY_DPMS_ENABLED: &str = "/xfce4-power-manager/dpms-enabled";
+    const XFCE4_PM_PROPERTY_DPMS_ON_AC_OFF: &str = "/xfce4-power-manager/dpms-on-ac-off";
+    const XFCE4_PM_PROPERTY_DPMS_ON_BATTERY_OFF: &str = "/xfce4-power-manager/dpms-on-battery-off";
+
+    const UPOWER_DEST: &str = "org.freedesktop.UPower";
+    const UPOWER_PATH: &str = "/org/freedesktop/UPower";
+    const DEVICE_IFACE: &str = "org.freedesktop.UPower.Device";
+ 
 
     pub(crate) fn new() -> Self {
 
@@ -97,7 +102,7 @@ impl LockScreen {
         let _log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
         let self_data = self.data.clone();
-        dbus.register_presentation_mode_signal(Self::CHANNEL, Self::PROPERTY_PRESENTATION_MODE, Mutex::new_arc(
+        dbus.register_presentation_mode_signal(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_PRESENTATION_MODE, Mutex::new_arc(
             move |presentation_mode| {
 
 
@@ -107,7 +112,7 @@ impl LockScreen {
         )?;
 
         let self_data = self.data.clone();
-        dbus.register_dpms_enabled_signal(Self::CHANNEL, Self::PROPERTY_DPMS_ENABLED, Mutex::new_arc(
+        dbus.register_dpms_enabled_signal(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ENABLED, Mutex::new_arc(
             move |dpms_enabled| {
                 
                 update_power_manager_data!(self_data, dpms_enabled);
@@ -115,7 +120,7 @@ impl LockScreen {
         }))?;
 
         let self_data = self.data.clone();
-        dbus.register_dpms_on_ac_sleep_signal(Self::CHANNEL, Self::PROPERTY_DPMS_ON_AC_OFF, Mutex::new_arc(
+        dbus.register_dpms_on_ac_sleep_signal(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_AC_OFF, Mutex::new_arc(
             move |dpms_on_ac_off| {
                 
                 update_power_manager_data!(self_data, dpms_on_ac_off);
@@ -123,7 +128,7 @@ impl LockScreen {
         }))?;
 
         let self_data = self.data.clone();
-        dbus.register_dpms_on_battery_off_signal(Self::CHANNEL, Self::PROPERTY_DPMS_ON_BATTERY_OFF, Mutex::new_arc(
+        dbus.register_dpms_on_battery_off_signal(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_BATTERY_OFF, Mutex::new_arc(
             move |dpms_on_battery_off| {
 
                 update_power_manager_data!(self_data, dpms_on_battery_off);

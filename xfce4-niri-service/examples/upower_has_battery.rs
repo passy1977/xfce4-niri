@@ -88,9 +88,11 @@ fn battery_state_name(state: u32) -> &'static str {
     }
 }
 
-fn print_power_state(conn: &Connection, device_path: &str) -> Result<(), Box<dyn Error>> {
+
+//(battery_or_ac: bool, is_present: bool, has_battery: bool, state: u32)
+fn print_power_state(conn: &Connection, device_path: &str) -> Result<(bool, bool, bool, u32), Box<dyn Error>> {
     let upower = conn.with_proxy(UPOWER_DEST, UPOWER_PATH, TIMEOUT);
-    let on_battery: bool = upower.get(UPOWER_IFACE, "OnBattery")?;
+    let battery_or_ac: bool = upower.get(UPOWER_IFACE, "OnBattery")?;
 
     let device = conn.with_proxy(UPOWER_DEST, device_path, TIMEOUT);
     let device_type: u32 = device.get(DEVICE_IFACE, "Type")?;
@@ -98,14 +100,14 @@ fn print_power_state(conn: &Connection, device_path: &str) -> Result<(), Box<dyn
     let state: u32 = device.get(DEVICE_IFACE, "State")?;
     let has_battery = is_present && device_type == DEVICE_TYPE_BATTERY;
 
-    let source = if on_battery { "battery" } else { "ac" };
+    let source = if battery_or_ac { "battery" } else { "ac" };
 
     println!(
         "has-battery: {has_battery}  power-source: {source}  battery-state: {}  \
-         (device={device_path}, type={device_type}, is_present={is_present}, on_battery={on_battery})",
+         (device={device_path}, type={device_type}, is_present={is_present}, on_battery={battery_or_ac})",
         battery_state_name(state)
     );
-    Ok(())
+    Ok((battery_or_ac, is_present, has_battery, state))
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -115,7 +117,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (device_path,): (dbus::Path,) = upower.method_call(UPOWER_IFACE, "GetDisplayDevice", ())?;
     let device_path = device_path.to_string();
 
-    print_power_state(&conn, &device_path)?;
+    let _ = print_power_state(&conn, &device_path)?;
 
     // The manager announces AC <-> battery transitions through OnBattery.
     let manager_rule = PropertiesPropertiesChanged::match_rule(
