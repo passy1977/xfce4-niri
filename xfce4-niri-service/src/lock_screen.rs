@@ -19,6 +19,7 @@
  ***************************************************************************/
 
 use std::ffi::c_int;
+use std::fs::read_to_string;
 use std::sync::Arc;
 
 use osal_rs::access_static_option;
@@ -38,12 +39,24 @@ struct LockScreenData {
     dpms_enabled: u64,
     dpms_on_ac_off: u64,
     dpms_on_battery_off: u64,
-    has_battery: bool
+    is_desktop: bool,
+    battery_or_ac: bool,
+    has_battery: bool,
+    state: u32
 }
 
 impl Default for LockScreenData {
     fn default() -> Self {
-        Self { presentation_mode: Default::default(), dpms_enabled: Default::default(), dpms_on_ac_off: Default::default(), dpms_on_battery_off: Default::default(), has_battery: Default::default() }
+        Self { 
+            presentation_mode: Default::default(), 
+            dpms_enabled: Default::default(), 
+            dpms_on_ac_off: Default::default(), 
+            dpms_on_battery_off: Default::default(), 
+            is_desktop: Default::default(),
+            battery_or_ac: Default::default(),
+            has_battery:  Default::default(),
+            state:  Default::default()
+        }
     }
 }
 
@@ -76,7 +89,7 @@ impl LockScreen {
 
     const UPOWER_DEST: &str = "org.freedesktop.UPower";
     const UPOWER_PATH: &str = "/org/freedesktop/UPower";
-    const DEVICE_IFACE: &str = "org.freedesktop.UPower.Device";
+    const UPOWER_DEVICE_IFACE: &str = "org.freedesktop.UPower.Device";
  
 
     pub(crate) fn new() -> Self {
@@ -89,9 +102,24 @@ impl LockScreen {
             }
         }
 
+        let int = read_to_string("/sys/class/dmi/id/chassis_type")
+                        .unwrap_or("0".to_string())
+                        .trim()
+                        .parse::<u32>()
+                        .unwrap_or(8);
+        
+        let is_desktop = match int {
+            3 | 4 | 5 | 6 | 7 | 13 | 23 | 24 => true,   // desktop, tower, all-in-one, rack
+            8 | 9 | 10 | 11 | 14 | 30 | 31 | 32 => false, // portable, laptop, notebook, tablet
+            _ => false,                                   // 1=other, 2=unknown, VM
+        };
+
         Self {
             thread: Thread::new("brightness_thd", 0, 0),
-            data: Mutex::new_arc(Default::default()),
+            data: Mutex::new_arc(LockScreenData {
+                is_desktop,
+                ..Default::default()
+            }),
         }
     }
 
@@ -132,8 +160,30 @@ impl LockScreen {
             move |dpms_on_battery_off| {
 
                 update_power_manager_data!(self_data, dpms_on_battery_off);
-
+                
         }))?;
+
+        let Ok(data) = self.data.lock() else {
+            return Err(Error::Unhandled("Failed to lock data mutex"));
+        };
+
+        if !data.is_desktop {
+            let self_data = self.data.clone();
+            dbus.register_power_source_signal(
+                Self::UPOWER_DEST,
+                Self::UPOWER_PATH,
+                    Self::UPOWER_DEVICE_IFACE,
+                Mutex::new_arc(
+                move |battery_or_ac, has_battery, state| {
+
+                    let mut guard = self_data.lock().unwrap();
+                    guard.battery_or_ac = battery_or_ac;
+                    guard.has_battery = has_battery;
+                    guard.state = state;
+
+                    //access_static_option!(EVENT_GROUP).set(0b0000011 as EventBits);
+            }))?;
+        }
 
 
         let self_data: Option<ThreadParam> = Some(self.data.clone());
