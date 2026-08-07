@@ -142,7 +142,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if xfce_names.is_empty() {
         println!("No org.xfce.* service is currently on the session bus.");
-        return Ok(());
+        return Ok(())
     }
 
     for name in xfce_names {
