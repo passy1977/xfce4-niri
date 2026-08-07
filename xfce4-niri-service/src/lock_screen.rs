@@ -39,7 +39,6 @@ static mut EVENT_GROUP: Option<EventGroup> = None;
 struct LockScreenData {
     presentation_mode: bool,
     dpms_on_ac_sleep: u64,
-    dpms_on_battery_sleep: u64,
     dpms_enabled: bool,
     dpms_on_ac_off: u64,
     dpms_on_battery_off: u64,
@@ -54,7 +53,6 @@ impl Default for LockScreenData {
         Self { 
             presentation_mode: Default::default(), 
             dpms_on_ac_sleep: Default::default(),
-            dpms_on_battery_sleep: Default::default(),
             dpms_enabled: Default::default(), 
             dpms_on_ac_off: Default::default(), 
             dpms_on_battery_off: Default::default(), 
@@ -185,13 +183,6 @@ impl LockScreen {
 
         } else {
 
-            let self_data = self.data.clone();
-            dbus.register_xfce4_power_manager_signal::<u64>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_AC_SLEEP, Mutex::new_arc(
-                move |dpms_on_ac_sleep| {
-
-                    update_power_manager_data!(self_data, dpms_on_ac_sleep);
-                    
-            }))?;
 
             let self_data = self.data.clone();
             dbus.register_xfce4_power_manager_signal::<u64>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_AC_OFF, Mutex::new_arc(
@@ -199,14 +190,6 @@ impl LockScreen {
                     
                     update_power_manager_data!(self_data, dpms_on_ac_off);
 
-            }))?;
-
-            let self_data = self.data.clone();
-            dbus.register_xfce4_power_manager_signal::<u64>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_BATTERY_SLEEP, Mutex::new_arc(
-                move |dpms_on_battery_sleep| {
-
-                    update_power_manager_data!(self_data, dpms_on_battery_sleep);
-                    
             }))?;
 
             let self_data = self.data.clone();
@@ -308,7 +291,8 @@ impl LockScreen {
         //     }
         // }
 
-        let mut sleep_in_minutes = if data.is_desktop {
+        let mut sleep_in_minutes =  if data.is_desktop {
+
             let dpms_on_ac_sleep = if data.dpms_on_ac_sleep == 0 {
                 Self::LOCK_SCREEN_AFTER_IN_MINUTES
             } else {
@@ -334,7 +318,7 @@ impl LockScreen {
             }
         };
 
-        let off_in_minutes = if data.is_desktop {
+        let mut off_in_minutes = if data.is_desktop {
             let dpms_on_ac_off = if data.dpms_on_ac_off == 0 {
                 Self::LOCK_SCREEN_AFTER_IN_MINUTES
             } else {
@@ -342,26 +326,14 @@ impl LockScreen {
             };
             dpms_on_ac_off * Self::ONE_MINUTE
 
-        } else {
-            if data.battery_or_ac {
-                let dpms_on_ac_off = if data.dpms_on_ac_off == 0 {
-                    Self::LOCK_SCREEN_AFTER_IN_MINUTES
-                } else {
-                    data.dpms_on_ac_off
-                };
-                dpms_on_ac_off * Self::ONE_MINUTE
-            } else {
-                let dpms_on_battery_off = if data.dpms_on_battery_off == 0 {
-                    Self::LOCK_SCREEN_AFTER_IN_MINUTES
-                } else {
-                    data.dpms_on_battery_off
-                };
-                dpms_on_battery_off * Self::ONE_MINUTE
-            }
-        };
+        } else { 0 };
 
-        if sleep_in_minutes < off_in_minutes {
-            sleep_in_minutes = off_in_minutes;
+        if data.is_desktop {
+            if sleep_in_minutes < off_in_minutes {
+                sleep_in_minutes = off_in_minutes;
+            }
+        } else {
+            off_in_minutes = sleep_in_minutes.saturating_add(2 * Self::ONE_MINUTE);
         }
 
         let mut child = Command::new(&Data::share().lock_screen_file)
