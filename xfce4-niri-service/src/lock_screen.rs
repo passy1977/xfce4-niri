@@ -18,7 +18,6 @@
  *
  ***************************************************************************/
 
-use std::ffi::c_int;
 use std::fs::read_to_string;
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
@@ -30,7 +29,6 @@ use osal_rs::utils::{Error, Result};
 
 use crate::data::Data;
 use crate::dbus::DBus;
-use crate::os::syslog::{Options, SysLog};
 
 
 static mut EVENT_GROUP: Option<EventGroup> = None;
@@ -135,10 +133,6 @@ impl LockScreen {
     }
 
     pub(super) fn start(&mut self, dbus: &DBus) -> Result<()> {
-
-
-
-        let _log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
         let self_data = self.data.clone();
         dbus.register_xfce4_power_manager_signal::<bool>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_PRESENTATION_MODE, Mutex::new_arc(
