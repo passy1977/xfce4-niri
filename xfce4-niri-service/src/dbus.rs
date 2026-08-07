@@ -79,8 +79,8 @@ impl FromRefArg for bool {
 }
 
 pub(crate) struct DBus {
-    thread: Thread,
-    conn: Arc<SyncConnection>,
+    xfce4_power_manager_thread: Thread,
+    xfce4_power_manager_conn: Arc<SyncConnection>,
     upower_thread: Thread,
     upower_conn: Arc<SyncConnection>,
 }
@@ -102,19 +102,19 @@ pub(crate) struct DBus {
         system_conn.set_signal_match_mode(true);
 
         Ok(Self{
-            thread: Thread::new("dbus_thd", 0, 0),
-            conn: Arc::new(conn),
-            upower_thread: Thread::new("dbus_sys_thd", 0, 0),
+            xfce4_power_manager_thread: Thread::new("xfce4_power_manager_thread_thd", 0, 0),
+            xfce4_power_manager_conn: Arc::new(conn),
+            upower_thread: Thread::new("upower_thd", 0, 0),
             upower_conn: Arc::new(system_conn)
         })
     }
 
 
-    fn register_signal<T: FromRefArg + Default>(&self, channel: &str, property: &str, on_change: Arc<Mutex<impl FnMut(T) + Send + 'static>>) -> Result<()> {
+    fn private_register_xfce4_power_manager_signal<T: FromRefArg + Default>(&self, channel: &str, property: &str, on_change: Arc<Mutex<impl FnMut(T) + Send + 'static>>) -> Result<()> {
 
         let signal_property: String = property.to_owned();
 
-        let xfconf = self.conn.with_proxy(Self::DEST, Self::PATH, Self::TIMEOUT);
+        let xfconf = self.xfce4_power_manager_conn.with_proxy(Self::DEST, Self::PATH, Self::TIMEOUT);
 
         let initial: T = match xfconf.method_call::<(Variant<Box<dyn RefArg>>,), _, _, _>("org.xfce.Xfconf", "GetProperty", (channel, property)) {
             Ok((value,)) => T::from_refarg(&*value.0).unwrap_or_default(),
@@ -168,13 +168,13 @@ pub(crate) struct DBus {
 
     #[inline]
     #[allow(dead_code)]
-    pub(crate) fn register_signal_with_initial<T: FromRefArg + Default>(
+    pub(crate) fn register_xfce4_power_manager_signal<T: FromRefArg + Default>(
         &self,
         channel: &str,
         property: &str,
         on_change: Arc<Mutex<impl FnMut(T) + Send + 'static>>
     ) -> Result<()> {
-        self.register_signal(channel, property, on_change)
+        self.private_register_xfce4_power_manager_signal(channel, property, on_change)
     }
 
 
@@ -253,9 +253,9 @@ pub(crate) struct DBus {
 
     pub(crate) fn start(&mut self) -> Result<()> {
 
-        let conn = self.conn.clone();
+        let conn = self.xfce4_power_manager_conn.clone();
 
-        self.thread.spawn(None,move |_, _| {
+        self.xfce4_power_manager_thread.spawn(None,move |_, _| {
                 let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
                 loop {
                     if let Err(e) = conn.process(Self::TIMEOUT) {
