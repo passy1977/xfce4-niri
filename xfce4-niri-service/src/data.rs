@@ -101,8 +101,8 @@ impl Data {
                 let mut niri_d_folder = config.clone();
                 niri_d_folder.push_str("niri/niri.d");
 
-                let mut xdg_home_autostart = local;
-                xdg_home_autostart.push_str("share/autostart");
+                let mut xdg_home_autostart = home.clone();
+                xdg_home_autostart.push_str("/.config/autostart");
 
                 let mut brightness_file = state;
                 brightness_file.push_str("xfce4_niri_brightness");
