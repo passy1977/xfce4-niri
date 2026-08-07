@@ -39,7 +39,8 @@ static mut EVENT_GROUP: Option<EventGroup> = None;
 #[derive(Clone, Debug)]
 struct LockScreenData {
     presentation_mode: u64,
-    dpms_enabled: u64,
+    dpms_on_ac_sleep: u64,
+    dpms_enabled: bool,
     dpms_on_ac_off: u64,
     dpms_on_battery_off: u64,
     is_desktop: bool,
@@ -52,6 +53,7 @@ impl Default for LockScreenData {
     fn default() -> Self {
         Self { 
             presentation_mode: Default::default(), 
+            dpms_on_ac_sleep: Default::default(),
             dpms_enabled: Default::default(), 
             dpms_on_ac_off: Default::default(), 
             dpms_on_battery_off: Default::default(), 
@@ -66,7 +68,7 @@ impl Default for LockScreenData {
 pub(crate) struct LockScreen {
     thread: Thread,
     data: Arc<Mutex<LockScreenData>>,
-    child: Arc<Option<Child>>
+    child: Arc<Mutex<Option<Child>>>
 }
 
 macro_rules! update_power_manager_data {
@@ -88,6 +90,7 @@ impl LockScreen {
     const XFCE4_PM_CHANNEL: &str = "xfce4-power-manager";
     const XFCE4_PM_PROPERTY_PRESENTATION_MODE: &str = "/xfce4-power-manager/presentation-mode";
     const XFCE4_PM_PROPERTY_DPMS_ENABLED: &str = "/xfce4-power-manager/dpms-enabled";
+    const XFCE4_PM_PROPERTY_DPMS_ON_AC_SLEEP: &str = "/xfce4-power-manager/dpms-on-ac-sleep";
     const XFCE4_PM_PROPERTY_DPMS_ON_AC_OFF: &str = "/xfce4-power-manager/dpms-on-ac-off";
     const XFCE4_PM_PROPERTY_DPMS_ON_BATTERY_OFF: &str = "/xfce4-power-manager/dpms-on-battery-off";
 
@@ -95,7 +98,8 @@ impl LockScreen {
     const UPOWER_PATH: &str = "/org/freedesktop/UPower";
     const UPOWER_IFACE: &str = "org.freedesktop.UPower";
     const UPOWER_DEVICE_IFACE: &str = "org.freedesktop.UPower.Device";
- 
+
+    const LOCK_SCREEN_AFTER_IN_MINUTES: u64 = 10;
 
     pub(crate) fn new() -> Self {
 
@@ -125,7 +129,7 @@ impl LockScreen {
                 is_desktop,
                 ..Default::default()
             }),
-            child: Arc::new(None)
+            child: Mutex::new_arc(None)
         }
     }
 
@@ -136,7 +140,7 @@ impl LockScreen {
         let _log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
         let self_data = self.data.clone();
-        dbus.register_presentation_mode_signal(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_PRESENTATION_MODE, Mutex::new_arc(
+        dbus.register_signal_with_initial::<u64>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_PRESENTATION_MODE, Mutex::new_arc(
             move |presentation_mode| {
 
 
@@ -146,36 +150,48 @@ impl LockScreen {
         )?;
 
         let self_data = self.data.clone();
-        dbus.register_dpms_enabled_signal(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ENABLED, Mutex::new_arc(
+        dbus.register_signal_with_initial::<bool>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ENABLED, Mutex::new_arc(
             move |dpms_enabled| {
                 
                 update_power_manager_data!(self_data, dpms_enabled);
                 
         }))?;
 
-        let self_data = self.data.clone();
-        dbus.register_dpms_on_ac_sleep_signal(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_AC_OFF, Mutex::new_arc(
-            move |dpms_on_ac_off| {
-                
-                update_power_manager_data!(self_data, dpms_on_ac_off);
-
-        }))?;
-
-        let self_data = self.data.clone();
-        dbus.register_dpms_on_battery_off_signal(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_BATTERY_OFF, Mutex::new_arc(
-            move |dpms_on_battery_off| {
-
-                update_power_manager_data!(self_data, dpms_on_battery_off);
-                
-        }))?;
 
         let Ok(data) = self.data.lock() else {
             return Err(Error::Unhandled("Failed to lock data mutex"));
         };
 
-        //if !data.is_desktop {
+        if data.is_desktop {
+
             let self_data = self.data.clone();
-            dbus.register_power_source_signal(
+            dbus.register_signal_with_initial::<u64>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_AC_SLEEP, Mutex::new_arc(
+                move |dpms_on_ac_sleep| {
+
+                    update_power_manager_data!(self_data, dpms_on_ac_sleep);
+                    
+            }))?;
+
+        } else {
+
+            let self_data = self.data.clone();
+            dbus.register_signal_with_initial::<u64>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_AC_OFF, Mutex::new_arc(
+                move |dpms_on_ac_off| {
+                    
+                    update_power_manager_data!(self_data, dpms_on_ac_off);
+
+            }))?;
+
+            let self_data = self.data.clone();
+            dbus.register_signal_with_initial::<u64>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_BATTERY_OFF, Mutex::new_arc(
+                move |dpms_on_battery_off| {
+
+                    update_power_manager_data!(self_data, dpms_on_battery_off);
+                    
+            }))?;
+
+            let self_data = self.data.clone();
+            dbus.register_upower_signals(
                 Self::UPOWER_DEST,
                 Self::UPOWER_PATH,
                 Self::UPOWER_IFACE,
@@ -190,16 +206,17 @@ impl LockScreen {
 
                     access_static_option!(EVENT_GROUP).set((1 << data.presentation_mode as u8) as EventBits);
             }))?;
-        //}
+
+        }
 
         let self_data: Option<ThreadParam> = Some( Arc::new((self.data.clone(), self.child.clone()) ));
 
         self.thread.spawn(self_data, |_, self_data| {
 
 
-            let arc_tuple  = self_data
-                        .and_then(|p| p.downcast::< (Arc<Mutex<LockScreenData>>, Mutex<Option<Child>>) >().ok())
-                        .ok_or(Error::Unhandled("Missing current_brightness parameter"))?;
+            let arc_tuple = self_data
+                        .and_then(|p| p.downcast::<(Arc<Mutex<LockScreenData>>, Arc<Mutex<Option<Child>>>)>().ok())
+                        .ok_or_else(|| Error::Unhandled("Missing or not valid data parameter"))?;
 
             loop {
                 let mask = access_static_option!(EVENT_GROUP).wait(0x3, false, TickType::MAX);
@@ -207,8 +224,6 @@ impl LockScreen {
                     access_static_option!(EVENT_GROUP).clear(mask);
                     let data = arc_tuple.0.lock().unwrap();
                     
-                    
-
                     if data.presentation_mode > 0 {
                         //let mut child = arc_tuple.1.lock();    
                     } else {
@@ -258,5 +273,8 @@ impl LockScreen {
 
         Ok(())
     }
+
+
+
 
  }

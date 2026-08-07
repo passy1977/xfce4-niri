@@ -62,7 +62,7 @@ impl SignalArgs for XFConfPropertyChanged {
     const INTERFACE: &'static str = "org.xfce.Xfconf";
 }
 
-trait FromRefArg: Sized {
+pub(crate) trait FromRefArg: Sized {
     fn from_refarg(value: &dyn RefArg) -> Option<Self>;
 }
 
@@ -81,8 +81,8 @@ impl FromRefArg for bool {
 pub(crate) struct DBus {
     thread: Thread,
     conn: Arc<SyncConnection>,
-    system_thread: Thread,
-    system_conn: Arc<SyncConnection>,
+    upower_thread: Thread,
+    upower_conn: Arc<SyncConnection>,
 }
 
  impl DBus {
@@ -104,8 +104,8 @@ pub(crate) struct DBus {
         Ok(Self{
             thread: Thread::new("dbus_thd", 0, 0),
             conn: Arc::new(conn),
-            system_thread: Thread::new("dbus_sys_thd", 0, 0),
-            system_conn: Arc::new(system_conn)
+            upower_thread: Thread::new("dbus_sys_thd", 0, 0),
+            upower_conn: Arc::new(system_conn)
         })
     }
 
@@ -119,9 +119,7 @@ pub(crate) struct DBus {
         let initial: T = match xfconf.method_call::<(Variant<Box<dyn RefArg>>,), _, _, _>("org.xfce.Xfconf", "GetProperty", (channel, property)) {
             Ok((value,)) => T::from_refarg(&*value.0).unwrap_or_default(),
             Err(e) => {
-                let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
-                let msg = format!("[{channel}]{property} not set yet ({e})");
-                log.syslog(Priority::LogWarning, &msg);
+                handle_power_source_error!(&format!("[{channel}]{property} not set yet ({e})"));
                 T::default()
             }
         };
@@ -169,56 +167,28 @@ pub(crate) struct DBus {
     }
 
     #[inline]
-    pub(crate) fn register_presentation_mode_signal(
-        &self, 
-        channel: &str, 
-        property: &str, 
-        on_presentation_mode: Arc<Mutex<impl FnMut(u64) + Send + 'static>>
+    #[allow(dead_code)]
+    pub(crate) fn register_signal_with_initial<T: FromRefArg + Default>(
+        &self,
+        channel: &str,
+        property: &str,
+        on_change: Arc<Mutex<impl FnMut(T) + Send + 'static>>
     ) -> Result<()> {
-        self.register_signal(channel, property, on_presentation_mode)
+        self.register_signal(channel, property, on_change)
     }
 
-    #[inline]
-    pub(crate) fn register_dpms_on_ac_sleep_signal(
-        &self, 
-        channel: &str, 
-        property: &str, 
-        on_dpms_on_ac_sleep: Arc<Mutex<impl FnMut(u64) + Send + 'static>>
-    ) -> Result<()> {
-        self.register_signal(channel, property, on_dpms_on_ac_sleep)
-    }
 
-    #[inline]
-    pub(crate) fn register_dpms_enabled_signal(
-        &self, 
-        channel: &str, 
-        property: &str, 
-        on_dpms_enabled: Arc<Mutex<impl FnMut(u64) + Send + 'static>>
-    ) -> Result<()> {
-        self.register_signal( channel, property, on_dpms_enabled)
-    }
-
-    #[inline]
-    pub(crate) fn register_dpms_on_battery_off_signal(
-        &self, 
-        channel: &str, 
-        property: &str, 
-        on_dpms_on_battery_off: Arc<Mutex<impl FnMut(u64) + Send + 'static>>
-    ) -> Result<()> {
-        self.register_signal(channel, property, on_dpms_on_battery_off)
-    }
-
-    pub(crate) fn register_power_source_signal(
+    pub(crate) fn register_upower_signals(
         &self,
         dest: &'static str,
         path: &'static str,
         iface: &'static str,
         device_iface: &'static str,
-        on_dpms_power_source: Arc<Mutex<impl FnMut(bool, bool, u32) + Send + 'static>>,
+        on_upower_signals: Arc<Mutex<impl FnMut(bool, bool, u32) + Send + 'static>>,
     ) -> Result<()> {
 
 
-        let upower = self.system_conn.with_proxy(dest, path, Self::TIMEOUT);
+        let upower = self.upower_conn.with_proxy(dest, path, Self::TIMEOUT);
         let (device_path,): (dbus::Path,) = upower.method_call(iface, "GetDisplayDevice", ()).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
         let device_path = device_path.to_string();
 
@@ -229,29 +199,25 @@ pub(crate) struct DBus {
         .static_clone();
 
         let watched_path = device_path.clone();
-        let value = on_dpms_power_source.clone();
-        let _ = Self::get_power_source_data(dest, path, iface, device_iface, &watched_path, &self.system_conn)
-            .map(|(battery_or_ac, has_battery, state)| {
-                (value.lock().unwrap())(battery_or_ac, has_battery, state);
-            })
-            .map_err(|e| {
-                handle_power_source_error!(&format!("Error occurred while processing power source data: {e}"))
-            })?;
+        let value = on_upower_signals.clone();
+        let _ = Self::get_power_source_data(dest, path, iface, device_iface, &watched_path, &self.upower_conn)
+            .map(|(battery_or_ac, has_battery, state)| (value.lock().unwrap())(battery_or_ac, has_battery, state))
+            .map_err(|e| handle_power_source_error!(&format!("Error occurred while processing power source data: {e}")))?;
 
 
         let watched_path = device_path.clone();
-        let value = on_dpms_power_source.clone();
-        self.system_conn.add_match(manager_rule, move |changed: PropertiesPropertiesChanged, conn, _msg| {
+        let value = on_upower_signals.clone();
+        self.upower_conn.add_match(manager_rule, move |changed: PropertiesPropertiesChanged, conn, _msg| {
             if changed.interface_name == iface
                 && changed.changed_properties.contains_key("OnBattery")
             {
-                let _ = Self::get_power_source_data(dest, path, iface, device_iface, &watched_path, conn)
-                    .map(|(battery_or_ac, has_battery, state)| {
-                        (value.lock().unwrap())(battery_or_ac, has_battery, state);
-                    })
-                    .map_err(|e| {
-                        handle_power_source_error!(&format!("Error occurred while processing power source data: {e}"))
-                    });
+
+                let Ok(_) = Self::get_power_source_data(dest, path, iface, device_iface, &watched_path, conn)
+                    .map(|(battery_or_ac, has_battery, state)|  (value.lock().unwrap())(battery_or_ac, has_battery, state) )
+                    .map_err(|e| handle_power_source_error!(&format!("Error occurred while processing power source data: {e}"))) else {
+                        return false
+                    };
+            
             }
             true
         }).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
@@ -263,20 +229,20 @@ pub(crate) struct DBus {
         .static_clone();
 
         let watched_path = device_path.clone();
-        let value = on_dpms_power_source.clone();
-        self.system_conn.add_match(device_rule, move |changed: PropertiesPropertiesChanged, conn, _msg| {
+        let value = on_upower_signals.clone();
+        self.upower_conn.add_match(device_rule, move |changed: PropertiesPropertiesChanged, conn, _msg| {
             if changed.interface_name == device_iface
                 && (changed.changed_properties.contains_key("IsPresent")
                     || changed.changed_properties.contains_key("Type")
                     || changed.changed_properties.contains_key("State"))
             {
-                let _ = Self::get_power_source_data(dest, path, iface, device_iface, &watched_path, conn)
-                    .map(|(battery_or_ac, has_battery, state)| {
-                        (value.lock().unwrap())(battery_or_ac, has_battery, state);
-                    })
-                    .map_err(|e| {
-                        handle_power_source_error!(&format!("Error occurred while processing power source data: {e}"))
-                    });
+
+                let Ok(_) = Self::get_power_source_data(dest, path, iface, device_iface, &watched_path, conn)
+                    .map(|(battery_or_ac, has_battery, state)|  (value.lock().unwrap())(battery_or_ac, has_battery, state) )
+                    .map_err(|e| handle_power_source_error!(&format!("Error occurred while processing power source data: {e}"))) else {
+                        return false
+                    };
+                    
             }
             true
         }).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
@@ -293,18 +259,18 @@ pub(crate) struct DBus {
                 let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
                 loop {
                     if let Err(e) = conn.process(Self::TIMEOUT) {
-                        log.syslog(Priority::LogWarning, &format!("dbus process error: {e}"));
+                        log.syslog(Priority::LogWarning, &format!("DBus process error: {e}"));
                     }
                 }
             })?;
 
-        let system_conn = self.system_conn.clone();
+        let upower_conn = self.upower_conn.clone();
 
-        self.system_thread.spawn(None,move |_, _| {
+        self.upower_thread.spawn(None,move |_, _| {
                 let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
                 loop {
-                    if let Err(e) = system_conn.process(Self::TIMEOUT) {
-                        log.syslog(Priority::LogWarning, &format!("dbus system process error: {e}"));
+                    if let Err(e) = upower_conn.process(Self::TIMEOUT) {
+                        log.syslog(Priority::LogWarning, &format!("UPower process error: {e}"));
                     }
                 }
             })?;
