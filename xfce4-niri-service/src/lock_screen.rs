@@ -23,7 +23,6 @@ use std::fs::read_to_string;
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 
-use dbus::channel;
 use osal_rs::access_static_option;
 use osal_rs::os::types::{EventBits, TickType};
 use osal_rs::os::{EventGroup, EventGroupFn, Mutex, MutexFn, Thread, ThreadFn, ThreadParam};
@@ -262,7 +261,7 @@ impl LockScreen {
                         }
 
                     } else {
-                        
+
                         let mut child = arc_tuple.1.lock().unwrap();
 
                         if let Some(mut child) = child.take() {

@@ -44,7 +44,6 @@ use std::time::Duration;
 
 use dbus::arg::{self, RefArg, Variant};
 use dbus::blocking::Connection;
-use dbus::message::SignalArgs;
 use dbus::Message;
 
 const TIMEOUT: Duration = Duration::from_millis(5000);
@@ -72,11 +71,6 @@ impl arg::ReadAll for XfconfPropertyChanged {
             value: i.read()?,
         })
     }
-}
-
-impl SignalArgs for XfconfPropertyChanged {
-    const NAME: &'static str = "PropertyChanged";
-    const INTERFACE: &'static str = "org.xfce.Xfconf";
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
