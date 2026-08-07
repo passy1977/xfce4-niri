@@ -102,6 +102,7 @@ impl LockScreen {
     const UPOWER_DEVICE_IFACE: &str = "org.freedesktop.UPower.Device";
 
     const LOCK_SCREEN_AFTER_IN_MINUTES: u64 = 10;
+    const ONE_MINUTE: u64 = 60;
 
     pub(crate) fn new() -> Self {
 
@@ -307,13 +308,13 @@ impl LockScreen {
         //     }
         // }
 
-        let sleep_in_minutes = if data.is_desktop {
+        let mut sleep_in_minutes = if data.is_desktop {
             let dpms_on_ac_sleep = if data.dpms_on_ac_sleep == 0 {
                 Self::LOCK_SCREEN_AFTER_IN_MINUTES
             } else {
                 data.dpms_on_ac_sleep
             };
-            format!("{}", dpms_on_ac_sleep * 60)
+            dpms_on_ac_sleep * Self::ONE_MINUTE
 
         } else {
             if data.battery_or_ac {
@@ -322,14 +323,14 @@ impl LockScreen {
                 } else {
                     data.dpms_on_ac_off
                 };
-                format!("{}", dpms_on_ac_off * 60)
+                dpms_on_ac_off * Self::ONE_MINUTE
             } else {
                 let dpms_on_battery_off = if data.dpms_on_battery_off == 0 {
                     Self::LOCK_SCREEN_AFTER_IN_MINUTES
                 } else {
                     data.dpms_on_battery_off
                 };
-                format!("{}", dpms_on_battery_off * 60)
+                dpms_on_battery_off * Self::ONE_MINUTE
             }
         };
 
@@ -339,7 +340,7 @@ impl LockScreen {
             } else {
                 data.dpms_on_ac_off
             };
-            format!("{}", dpms_on_ac_off * 60)
+            dpms_on_ac_off * Self::ONE_MINUTE
 
         } else {
             if data.battery_or_ac {
@@ -348,16 +349,20 @@ impl LockScreen {
                 } else {
                     data.dpms_on_ac_off
                 };
-                format!("{}", dpms_on_ac_off * 60)
+                dpms_on_ac_off * Self::ONE_MINUTE
             } else {
                 let dpms_on_battery_off = if data.dpms_on_battery_off == 0 {
                     Self::LOCK_SCREEN_AFTER_IN_MINUTES
                 } else {
                     data.dpms_on_battery_off
                 };
-                format!("{}", dpms_on_battery_off * 60)
+                dpms_on_battery_off * Self::ONE_MINUTE
             }
         };
+
+        if sleep_in_minutes < off_in_minutes {
+            sleep_in_minutes = off_in_minutes;
+        }
 
         let mut child = Command::new(&Data::share().lock_screen_file)
             .stdout(Stdio::piped())
