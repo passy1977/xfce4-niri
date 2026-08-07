@@ -23,6 +23,7 @@ use std::fs::read_to_string;
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 
+use dbus::channel;
 use osal_rs::access_static_option;
 use osal_rs::os::types::{EventBits, TickType};
 use osal_rs::os::{EventGroup, EventGroupFn, Mutex, MutexFn, Thread, ThreadFn, ThreadParam};
@@ -65,7 +66,7 @@ impl Default for LockScreenData {
 pub(crate) struct LockScreen {
     thread: Thread,
     data: Arc<Mutex<LockScreenData>>,
-    child: Option<Arc<Mutex<Child>>>
+    child: Arc<Option<Child>>
 }
 
 macro_rules! update_power_manager_data {
@@ -124,7 +125,7 @@ impl LockScreen {
                 is_desktop,
                 ..Default::default()
             }),
-            child: None
+            child: Arc::new(None)
         }
     }
 
@@ -191,51 +192,63 @@ impl LockScreen {
             }))?;
         //}
 
-        todo!("Fix this");
-        let self_data: Option<ThreadParam> = Some( Arc::new((self.data.clone(), self.child.clone())));
+        let self_data: Option<ThreadParam> = Some( Arc::new((self.data.clone(), self.child.clone()) ));
 
         self.thread.spawn(self_data, |_, self_data| {
 
 
-            let self_data = self_data
-                        .and_then(|p| p.downcast::<Mutex<LockScreenData>>().ok())
+            let arc_tuple  = self_data
+                        .and_then(|p| p.downcast::< (Arc<Mutex<LockScreenData>>, Mutex<Option<Child>>) >().ok())
                         .ok_or(Error::Unhandled("Missing current_brightness parameter"))?;
 
             loop {
                 let mask = access_static_option!(EVENT_GROUP).wait(0x3, false, TickType::MAX);
                 if mask > 0 {
                     access_static_option!(EVENT_GROUP).clear(mask);
-                    let data = self_data.lock().unwrap();
+                    let data = arc_tuple.0.lock().unwrap();
                     
                     
 
-                        let child = Command::new(&Data::share().lock_screen_file)
-                            .stdout(Stdio::piped())
-                            .stderr(Stdio::piped())
-                            .arg(format!("{}", data.dpms_enabled))
-                            .spawn()
-                            .expect("Failed to execute command");
+                    if data.presentation_mode > 0 {
+                        //let mut child = arc_tuple.1.lock();    
+                    } else {
+                        let mut child = arc_tuple.1.lock().unwrap();
 
-                        //println!("{:?}", String::from_utf8_lossy(&output.stdout));
+                        if let Some(mut child) = child.take() {
+                            child.kill().expect("Command couldn't be killed");
+                        }
+
+
+                    }
+                    
+
+                        // let child = Command::new(&Data::share().lock_screen_file)
+                        //     .stdout(Stdio::piped())
+                        //     .stderr(Stdio::piped())
+                        //     .arg(format!("{}", data.dpms_enabled))
+                        //     .spawn()
+                        //     .expect("Failed to execute command");
+
+                        // //println!("{:?}", String::from_utf8_lossy(&output.stdout));
                         
-                        let pid = child.id();          // u32 — disponibile subito, processo ancora vivo
-                        println!("lock screen pid: {pid}");
+                        // let pid = child.id();          // u32 — disponibile subito, processo ancora vivo
+                        // println!("lock screen pid: {pid}");
 
-                        let output = child.wait_with_output().expect("Failed to wait command");
-                        println!("{:?}", String::from_utf8_lossy(&output.stdout));
+                        // let output = child.wait_with_output().expect("Failed to wait command");
+                        // println!("{:?}", String::from_utf8_lossy(&output.stdout));
 
                      
 
 
-                        match mask {
-                            0b0000001 => {
-                                println!("Enable presentation mode:{:?}", *data)
-                            }
-                            0b0000010 => {
-                                println!("Disable presentation mode:{:?}", *data)
-                            }
-                            _ => ()
+                    match mask {
+                        0b0000001 => {
+                            println!("Enable presentation mode:{:?}", *data)
                         }
+                        0b0000010 => {
+                            println!("Disable presentation mode:{:?}", *data)
+                        }
+                        _ => ()
+                    }
 
                     
                 }
