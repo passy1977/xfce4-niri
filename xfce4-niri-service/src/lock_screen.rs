@@ -38,8 +38,9 @@ static mut EVENT_GROUP: Option<EventGroup> = None;
 
 #[derive(Clone, Debug)]
 struct LockScreenData {
-    presentation_mode: u64,
+    presentation_mode: bool,
     dpms_on_ac_sleep: u64,
+    dpms_on_battery_sleep: u64,
     dpms_enabled: bool,
     dpms_on_ac_off: u64,
     dpms_on_battery_off: u64,
@@ -54,6 +55,7 @@ impl Default for LockScreenData {
         Self { 
             presentation_mode: Default::default(), 
             dpms_on_ac_sleep: Default::default(),
+            dpms_on_battery_sleep: Default::default(),
             dpms_enabled: Default::default(), 
             dpms_on_ac_off: Default::default(), 
             dpms_on_battery_off: Default::default(), 
@@ -92,6 +94,7 @@ impl LockScreen {
     const XFCE4_PM_PROPERTY_DPMS_ENABLED: &str = "/xfce4-power-manager/dpms-enabled";
     const XFCE4_PM_PROPERTY_DPMS_ON_AC_SLEEP: &str = "/xfce4-power-manager/dpms-on-ac-sleep";
     const XFCE4_PM_PROPERTY_DPMS_ON_AC_OFF: &str = "/xfce4-power-manager/dpms-on-ac-off";
+    const XFCE4_PM_PROPERTY_DPMS_ON_BATTERY_SLEEP: &str = "/xfce4-power-manager/dpms-on-battery-sleep";
     const XFCE4_PM_PROPERTY_DPMS_ON_BATTERY_OFF: &str = "/xfce4-power-manager/dpms-on-battery-off";
 
     const UPOWER_DEST: &str = "org.freedesktop.UPower";
@@ -140,7 +143,7 @@ impl LockScreen {
         let _log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
         let self_data = self.data.clone();
-        dbus.register_signal_with_initial::<u64>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_PRESENTATION_MODE, Mutex::new_arc(
+        dbus.register_signal_with_initial::<bool>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_PRESENTATION_MODE, Mutex::new_arc(
             move |presentation_mode| {
 
 
@@ -172,7 +175,23 @@ impl LockScreen {
                     
             }))?;
 
+            let self_data = self.data.clone();
+            dbus.register_signal_with_initial::<u64>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_AC_OFF, Mutex::new_arc(
+                move |dpms_on_ac_off| {
+
+                    update_power_manager_data!(self_data, dpms_on_ac_off);
+                    
+            }))?;
+
         } else {
+
+            let self_data = self.data.clone();
+            dbus.register_signal_with_initial::<u64>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_AC_SLEEP, Mutex::new_arc(
+                move |dpms_on_ac_sleep| {
+
+                    update_power_manager_data!(self_data, dpms_on_ac_sleep);
+                    
+            }))?;
 
             let self_data = self.data.clone();
             dbus.register_signal_with_initial::<u64>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_AC_OFF, Mutex::new_arc(
@@ -180,6 +199,14 @@ impl LockScreen {
                     
                     update_power_manager_data!(self_data, dpms_on_ac_off);
 
+            }))?;
+
+            let self_data = self.data.clone();
+            dbus.register_signal_with_initial::<u64>(Self::XFCE4_PM_CHANNEL, Self::XFCE4_PM_PROPERTY_DPMS_ON_BATTERY_SLEEP, Mutex::new_arc(
+                move |dpms_on_battery_sleep| {
+
+                    update_power_manager_data!(self_data, dpms_on_battery_sleep);
+                    
             }))?;
 
             let self_data = self.data.clone();
@@ -224,46 +251,35 @@ impl LockScreen {
                     access_static_option!(EVENT_GROUP).clear(mask);
                     let data = arc_tuple.0.lock().unwrap();
                     
-                    if data.presentation_mode > 0 {
-                        //let mut child = arc_tuple.1.lock();    
+                    if data.presentation_mode {
+                        
+                        if data.dpms_enabled {
+                            let Ok(child) = Self::execute_lock_screen_command(&data) else {
+                                continue;
+                            };
+                            
+                            arc_tuple.1.lock().unwrap().replace(child);
+                        }
+
                     } else {
+                        
                         let mut child = arc_tuple.1.lock().unwrap();
 
                         if let Some(mut child) = child.take() {
                             child.kill().expect("Command couldn't be killed");
                         }
 
-
                     }
-                    
 
-                        // let child = Command::new(&Data::share().lock_screen_file)
-                        //     .stdout(Stdio::piped())
-                        //     .stderr(Stdio::piped())
-                        //     .arg(format!("{}", data.dpms_enabled))
-                        //     .spawn()
-                        //     .expect("Failed to execute command");
-
-                        // //println!("{:?}", String::from_utf8_lossy(&output.stdout));
-                        
-                        // let pid = child.id();          // u32 — disponibile subito, processo ancora vivo
-                        // println!("lock screen pid: {pid}");
-
-                        // let output = child.wait_with_output().expect("Failed to wait command");
-                        // println!("{:?}", String::from_utf8_lossy(&output.stdout));
-
-                     
-
-
-                    match mask {
-                        0b0000001 => {
-                            println!("Enable presentation mode:{:?}", *data)
-                        }
-                        0b0000010 => {
-                            println!("Disable presentation mode:{:?}", *data)
-                        }
-                        _ => ()
-                    }
+                    // match mask {
+                    //     0b0000001 => {
+                    //         println!("Enable presentation mode:{:?}", *data)
+                    //     }
+                    //     0b0000010 => {
+                    //         println!("Disable presentation mode:{:?}", *data)
+                    //     }
+                    //     _ => ()
+                    // }
 
                     
                 }
@@ -274,7 +290,86 @@ impl LockScreen {
         Ok(())
     }
 
+    fn execute_lock_screen_command(data: &LockScreenData) -> Result<Child> {
+        // if data.is_desktop && data.dpms_on_ac_sleep == 0 {
+        //     return Ok(());
+        // } 
 
+        // if !data.is_desktop {
+        //    if data.battery_or_ac && data.dpms_on_ac_off == 0 {
+        //         return Ok(());
+        //     } else if !data.battery_or_ac && data.dpms_on_battery_off == 0 {
+        //         return Ok(());
+        //     }
+        // }
+
+        let sleep_in_minutes = if data.is_desktop {
+            let dpms_on_ac_sleep = if data.dpms_on_ac_sleep == 0 {
+                Self::LOCK_SCREEN_AFTER_IN_MINUTES
+            } else {
+                data.dpms_on_ac_sleep
+            };
+            format!("{}", dpms_on_ac_sleep * 60)
+
+        } else {
+            if data.battery_or_ac {
+                let dpms_on_ac_off = if data.dpms_on_ac_off == 0 {
+                    Self::LOCK_SCREEN_AFTER_IN_MINUTES
+                } else {
+                    data.dpms_on_ac_off
+                };
+                format!("{}", dpms_on_ac_off * 60)
+            } else {
+                let dpms_on_battery_off = if data.dpms_on_battery_off == 0 {
+                    Self::LOCK_SCREEN_AFTER_IN_MINUTES
+                } else {
+                    data.dpms_on_battery_off
+                };
+                format!("{}", dpms_on_battery_off * 60)
+            }
+        };
+
+        let off_in_minutes = if data.is_desktop {
+            let dpms_on_ac_off = if data.dpms_on_ac_off == 0 {
+                Self::LOCK_SCREEN_AFTER_IN_MINUTES
+            } else {
+                data.dpms_on_ac_off
+            };
+            format!("{}", dpms_on_ac_off * 60)
+
+        } else {
+            if data.battery_or_ac {
+                let dpms_on_ac_off = if data.dpms_on_ac_off == 0 {
+                    Self::LOCK_SCREEN_AFTER_IN_MINUTES
+                } else {
+                    data.dpms_on_ac_off
+                };
+                format!("{}", dpms_on_ac_off * 60)
+            } else {
+                let dpms_on_battery_off = if data.dpms_on_battery_off == 0 {
+                    Self::LOCK_SCREEN_AFTER_IN_MINUTES
+                } else {
+                    data.dpms_on_battery_off
+                };
+                format!("{}", dpms_on_battery_off * 60)
+            }
+        };
+
+        let child = Command::new(&Data::share().lock_screen_file)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .arg(format!("{} {}", sleep_in_minutes, off_in_minutes))
+            .spawn()
+            .expect("Failed to execute command");
+
+        let pid = child.id();
+        println!("lock screen pid: {pid}");
+
+        // let output = child.wait_with_output().expect("Failed to wait command");
+        // println!("{:?}", String::from_utf8_lossy(&output.stdout));
+
+        Ok(child)
+    }
 
 
  }
