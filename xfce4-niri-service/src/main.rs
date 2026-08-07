@@ -21,13 +21,14 @@
 use std::{error::Error, ffi::c_int};
 
 use osal_rs::os::{System, SystemFn};
+use crate::autostart::Autostart;
 use crate::data::Data;
 use crate::dbus::DBus;
 use crate::brightness::Brightness;
 use crate::lock_screen::LockScreen;
 use crate::os::syslog::{Options, Priority, SysLog};
 
-
+mod autostart;
 mod brightness;
 mod data;
 mod dbus;
@@ -62,6 +63,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if let Err(e) = LockScreen::new().start(&dbus) {
+        let msg = e.to_string();
+        log.syslog(Priority::LogCrit, &msg);
+        return Err(msg.into());
+    }
+    
+    if let Err(e) = Autostart::new().start() {
         let msg = e.to_string();
         log.syslog(Priority::LogCrit, &msg);
         return Err(msg.into());

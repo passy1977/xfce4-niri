@@ -44,12 +44,10 @@ impl Default for BrightnessData {
     }
 }
 
-#[allow(unused)]
 #[derive(Clone)]
 pub(crate) struct Brightness {
     thread: Thread,
     current_brightness: Arc<Mutex<i32>>,
-    device: Option<String>
 }
 
 
@@ -61,7 +59,6 @@ impl Brightness {
         Self {
             thread: Thread::new("brightness_thd", 0, 0),
             current_brightness: Mutex::new_arc(-1),
-            device: None
         }
     }
 
