@@ -76,7 +76,7 @@ impl SysLog {
 
     pub(crate) fn syslog(&self, priority: Priority, msg: &str) {
         let Ok(msg) = CString::new(msg) else {
-            return;
+            return
         };
         unsafe {
             ffi::syslog(priority as c_int, c"%s".as_ptr(), msg.as_ptr());
@@ -86,11 +86,11 @@ impl SysLog {
     #[allow(dead_code)]
     pub(crate) fn syslog_with_tag(&self, tag: &str, priority: Priority, msg: &str) {
         let Ok(tag) = CString::new(tag) else {
-            return;
+            return
         }; 
 
         let Ok(msg) = CString::new(msg) else {
-            return;
+            return
         };
 
         unsafe {

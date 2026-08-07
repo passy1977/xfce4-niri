@@ -25,7 +25,7 @@ use std::sync::Arc;
 
 use osal_rs::access_static_option;
 use osal_rs::os::types::{EventBits, TickType};
-use osal_rs::os::{EventGroup, EventGroupFn, Mutex, MutexFn, Thread, ThreadFn, ThreadParam};
+use osal_rs::os::{EventGroup, EventGroupFn, Mutex, MutexFn, MutexGuard, Thread, ThreadFn, ThreadParam};
 use osal_rs::utils::{Error, Result};
 
 use crate::data::Data;
@@ -161,7 +161,7 @@ impl LockScreen {
 
 
         let Ok(data) = self.data.lock() else {
-            return Err(Error::Unhandled("Failed to lock data mutex"));
+            return Err(Error::Unhandled("Failed to lock data mutex"))
         };
 
         if data.is_desktop {
@@ -250,7 +250,7 @@ impl LockScreen {
                     access_static_option!(EVENT_GROUP).clear(mask);
                     let data = arc_tuple.0.lock().unwrap();
                     
-                    if data.presentation_mode {
+                    if !data.presentation_mode {
                         
                         if data.dpms_enabled {
                             let Ok(child) = Self::execute_lock_screen_command(&data) else {
@@ -258,15 +258,20 @@ impl LockScreen {
                             };
                             
                             arc_tuple.1.lock().unwrap().replace(child);
+                        } else {
+                            let mut child = arc_tuple.1.lock().unwrap();
+
+                            Self::kill_lock_screen_command(&mut child);
                         }
 
                     } else {
 
                         let mut child = arc_tuple.1.lock().unwrap();
 
-                        if let Some(mut child) = child.take() {
-                            child.kill().expect("Command couldn't be killed");
-                        }
+                        Self::kill_lock_screen_command(&mut child);
+                        // if let Some(mut child) = child.take() {
+                        //     child.kill().expect("Command couldn't be killed");
+                        // }
 
                     }
 
@@ -354,7 +359,7 @@ impl LockScreen {
             }
         };
 
-        let child = Command::new(&Data::share().lock_screen_file)
+        let mut child = Command::new(&Data::share().lock_screen_file)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .arg(format!("{} {}", sleep_in_minutes, off_in_minutes))
@@ -364,11 +369,23 @@ impl LockScreen {
         let pid = child.id();
         println!("lock screen pid: {pid}");
 
-        // let output = child.wait_with_output().expect("Failed to wait command");
-        // println!("{:?}", String::from_utf8_lossy(&output.stdout));
+        let Ok(exit_status) = child.wait() else {
+            return Err(Error::Unhandled("Failed to wait for command"))
+        };
 
-        Ok(child)
+        if !exit_status.success() {
+            Err(Error::Unhandled("Command exited with non-zero status"))
+        } else {
+            Ok(child)
+        }
+
+        
     }
 
+    fn kill_lock_screen_command(child: & mut MutexGuard<'_, Option<Child>>) {
+        if let Some(mut child) = child.take() {
+            child.kill().expect("Command couldn't be killed");
+        }
+    }
 
  }

@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug xfce4-niri-service",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--package",
+                    "xfce4-niri-service",
+                    "--bin",
+                    "xfce4-niri-service"
+                ],
+                "filter": {
+                    "name": "xfce4-niri-service",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

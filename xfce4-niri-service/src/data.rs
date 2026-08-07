@@ -162,7 +162,7 @@ impl Data {
         if !fs::metadata(self.lock_screen_file.clone())
             .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
             .unwrap_or(false) {
-                return Err(Error::UnhandledOwned(format!("Lock screen file is not executable: {}", self.lock_screen_file)).to_string());
+                return Err(Error::UnhandledOwned(format!("Lock screen file is not executable: {}", self.lock_screen_file)).to_string())
             }
 
         Ok(())
