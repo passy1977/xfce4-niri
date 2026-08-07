@@ -20,6 +20,7 @@
 
 use std::fs::{DirEntry, File};
 use std::io::{Read, Write};
+use std::os::unix::fs::PermissionsExt;
 use std::{fs, path::Path};
 use std::env;
 use std::str::FromStr;
@@ -55,7 +56,8 @@ pub(crate) struct Data {
     pub(crate) niri_file: String,
     pub(crate) niri_d_folder: String,
     pub(crate) xdg_home_autostart: String,
-    pub(crate) brightness_file: String
+    pub(crate) brightness_file: String,
+    pub(crate) lock_screen_file: String
 }
 
 
@@ -99,18 +101,22 @@ impl Data {
                 let mut niri_d_folder = config.clone();
                 niri_d_folder.push_str("niri/niri.d");
 
-                let mut xdg_home_autostart = local.clone();
+                let mut xdg_home_autostart = local;
                 xdg_home_autostart.push_str("share/autostart");
 
                 let mut brightness_file = state;
                 brightness_file.push_str("xfce4_niri_brightness");
+
+                let mut lock_screen_file = config.clone();
+                lock_screen_file.push_str("niri/bin/lock_screen");
 
                 let data = Self { 
                     user_home: home, 
                     niri_file, 
                     niri_d_folder, 
                     xdg_home_autostart, 
-                    brightness_file 
+                    brightness_file,
+                    lock_screen_file
                 };
 
                 unsafe {
@@ -129,16 +135,17 @@ impl Data {
     }
 
     pub(crate) fn check_persistence(&self) -> Result<(), String> {
-        let folders = [
+        let elements = [
             (self.niri_file.clone(), true, format!("Niri config file not found: {}", self.niri_file)),
             (self.niri_d_folder.clone(), true,format!("Niri config folder not found: {}", self.niri_d_folder)),
             (String::from_str(XDG_AUTOSTART).unwrap_or_default(), true, format!("XDG autostart folder not found: {XDG_AUTOSTART}")),
             (self.xdg_home_autostart.clone(), false, format!("XDG home autostart folder not found: {}", self.xdg_home_autostart)),
+            (self.lock_screen_file.clone(), false, format!("Lock screen file not found: {}", self.lock_screen_file)),
         ];
 
         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
-        for (file_or_folder, mandatory, error) in folders {
+        for (file_or_folder, mandatory, error) in elements {
             
             let file_or_folder = Path::new(&file_or_folder);
 
@@ -151,6 +158,12 @@ impl Data {
                 }
             }
         };
+
+        if !fs::metadata(self.lock_screen_file.clone())
+            .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false) {
+                return Err(Error::UnhandledOwned(format!("Lock screen file is not executable: {}", self.lock_screen_file)).to_string());
+            }
 
         Ok(())
     }

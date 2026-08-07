@@ -20,6 +20,7 @@
 
 use std::ffi::c_int;
 use std::fs::read_to_string;
+use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 
 use osal_rs::access_static_option;
@@ -27,6 +28,7 @@ use osal_rs::os::types::{EventBits, TickType};
 use osal_rs::os::{EventGroup, EventGroupFn, Mutex, MutexFn, Thread, ThreadFn, ThreadParam};
 use osal_rs::utils::{Error, Result};
 
+use crate::data::Data;
 use crate::dbus::DBus;
 use crate::os::syslog::{Options, SysLog};
 
@@ -63,6 +65,7 @@ impl Default for LockScreenData {
 pub(crate) struct LockScreen {
     thread: Thread,
     data: Arc<Mutex<LockScreenData>>,
+    child: Option<Arc<Mutex<Child>>>
 }
 
 macro_rules! update_power_manager_data {
@@ -89,6 +92,7 @@ impl LockScreen {
 
     const UPOWER_DEST: &str = "org.freedesktop.UPower";
     const UPOWER_PATH: &str = "/org/freedesktop/UPower";
+    const UPOWER_IFACE: &str = "org.freedesktop.UPower";
     const UPOWER_DEVICE_IFACE: &str = "org.freedesktop.UPower.Device";
  
 
@@ -120,6 +124,7 @@ impl LockScreen {
                 is_desktop,
                 ..Default::default()
             }),
+            child: None
         }
     }
 
@@ -167,31 +172,32 @@ impl LockScreen {
             return Err(Error::Unhandled("Failed to lock data mutex"));
         };
 
-        if !data.is_desktop {
+        //if !data.is_desktop {
             let self_data = self.data.clone();
             dbus.register_power_source_signal(
                 Self::UPOWER_DEST,
                 Self::UPOWER_PATH,
-                    Self::UPOWER_DEVICE_IFACE,
+                Self::UPOWER_IFACE,
+                Self::UPOWER_DEVICE_IFACE,
                 Mutex::new_arc(
                 move |battery_or_ac, has_battery, state| {
 
-                    let mut guard = self_data.lock().unwrap();
-                    guard.battery_or_ac = battery_or_ac;
-                    guard.has_battery = has_battery;
-                    guard.state = state;
+                    let mut data = self_data.lock().unwrap();
+                    data.battery_or_ac = battery_or_ac;
+                    data.has_battery = has_battery;
+                    data.state = state;
 
-                    //access_static_option!(EVENT_GROUP).set(0b0000011 as EventBits);
+                    access_static_option!(EVENT_GROUP).set((1 << data.presentation_mode as u8) as EventBits);
             }))?;
-        }
+        //}
+
+        todo!("Fix this");
+        let self_data: Option<ThreadParam> = Some( Arc::new((self.data.clone(), self.child.clone())));
+
+        self.thread.spawn(self_data, |_, self_data| {
 
 
-        let self_data: Option<ThreadParam> = Some(self.data.clone());
-
-        self.thread.spawn(self_data, |_, param| {
-
-
-            let param = param
+            let self_data = self_data
                         .and_then(|p| p.downcast::<Mutex<LockScreenData>>().ok())
                         .ok_or(Error::Unhandled("Missing current_brightness parameter"))?;
 
@@ -199,16 +205,39 @@ impl LockScreen {
                 let mask = access_static_option!(EVENT_GROUP).wait(0x3, false, TickType::MAX);
                 if mask > 0 {
                     access_static_option!(EVENT_GROUP).clear(mask);
-                    let data = param.lock().unwrap();
-                    match mask {
-                        0b0000001 => {
-                            println!("Switch on PowerManagerData:{:?}", *data)
+                    let data = self_data.lock().unwrap();
+                    
+                    
+
+                        let child = Command::new(&Data::share().lock_screen_file)
+                            .stdout(Stdio::piped())
+                            .stderr(Stdio::piped())
+                            .arg(format!("{}", data.dpms_enabled))
+                            .spawn()
+                            .expect("Failed to execute command");
+
+                        //println!("{:?}", String::from_utf8_lossy(&output.stdout));
+                        
+                        let pid = child.id();          // u32 — disponibile subito, processo ancora vivo
+                        println!("lock screen pid: {pid}");
+
+                        let output = child.wait_with_output().expect("Failed to wait command");
+                        println!("{:?}", String::from_utf8_lossy(&output.stdout));
+
+                     
+
+
+                        match mask {
+                            0b0000001 => {
+                                println!("Enable presentation mode:{:?}", *data)
+                            }
+                            0b0000010 => {
+                                println!("Disable presentation mode:{:?}", *data)
+                            }
+                            _ => ()
                         }
-                        0b0000010 => {
-                            println!("Switch off PowerManagerData:{:?}", *data)
-                        }
-                        _ => ()
-                    }
+
+                    
                 }
             }
             

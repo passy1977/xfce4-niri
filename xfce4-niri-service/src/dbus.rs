@@ -79,8 +79,10 @@ impl FromRefArg for bool {
 }
 
 pub(crate) struct DBus {
-    thread: Thread, 
-    conn: Arc<SyncConnection>, 
+    thread: Thread,
+    conn: Arc<SyncConnection>,
+    system_thread: Thread,
+    system_conn: Arc<SyncConnection>,
 }
 
  impl DBus {
@@ -92,13 +94,18 @@ pub(crate) struct DBus {
 
     pub(crate) fn new() -> Result<Self> {
 
+        // xfconf is a per-session service, UPower is a system service.
         let conn = SyncConnection::new_session().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let system_conn = SyncConnection::new_system().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
 
         conn.set_signal_match_mode(true);
+        system_conn.set_signal_match_mode(true);
 
         Ok(Self{
             thread: Thread::new("dbus_thd", 0, 0),
-            conn: Arc::new(conn)
+            conn: Arc::new(conn),
+            system_thread: Thread::new("dbus_sys_thd", 0, 0),
+            system_conn: Arc::new(system_conn)
         })
     }
 
@@ -141,19 +148,21 @@ pub(crate) struct DBus {
         dest: &str,
         path: &str,
         iface: &'static str,
+        device_iface: &'static str,
         device_path: &str,
         conn: &SyncConnection
     ) -> Result<(bool, bool, u32)> {
 
         const DEVICE_TYPE_BATTERY: u32 = 2;
 
+        // OnBattery lives on the manager interface, the rest on the device one.
         let upower = conn.with_proxy(dest, path, Self::TIMEOUT);
         let battery_or_ac: bool = upower.get(iface, "OnBattery").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
 
         let device = conn.with_proxy(dest, device_path, Self::TIMEOUT);
-        let device_type: u32 = device.get(iface, "Type").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-        let is_present: bool = device.get(iface, "IsPresent").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-        let state: u32 = device.get(iface, "State").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let device_type: u32 = device.get(device_iface, "Type").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let is_present: bool = device.get(device_iface, "IsPresent").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let state: u32 = device.get(device_iface, "State").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
         let has_battery = is_present && device_type == DEVICE_TYPE_BATTERY;
 
         Ok((battery_or_ac, has_battery, state))
@@ -204,23 +213,24 @@ pub(crate) struct DBus {
         dest: &'static str,
         path: &'static str,
         iface: &'static str,
+        device_iface: &'static str,
         on_dpms_power_source: Arc<Mutex<impl FnMut(bool, bool, u32) + Send + 'static>>,
     ) -> Result<()> {
 
 
-        let upower = self.conn.with_proxy(dest, path, Self::TIMEOUT);
+        let upower = self.system_conn.with_proxy(dest, path, Self::TIMEOUT);
         let (device_path,): (dbus::Path,) = upower.method_call(iface, "GetDisplayDevice", ()).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
         let device_path = device_path.to_string();
 
         let manager_rule = PropertiesPropertiesChanged::match_rule(
             Some(&dest.into()),
-            Some(&dest.into()),
+            Some(&path.into()),
         )
         .static_clone();
 
         let watched_path = device_path.clone();
         let value = on_dpms_power_source.clone();
-        let _ = Self::get_power_source_data(dest, path, iface, &watched_path, &self.conn)
+        let _ = Self::get_power_source_data(dest, path, iface, device_iface, &watched_path, &self.system_conn)
             .map(|(battery_or_ac, has_battery, state)| {
                 (value.lock().unwrap())(battery_or_ac, has_battery, state);
             })
@@ -231,11 +241,11 @@ pub(crate) struct DBus {
 
         let watched_path = device_path.clone();
         let value = on_dpms_power_source.clone();
-        self.conn.add_match(manager_rule, move |changed: PropertiesPropertiesChanged, conn, _msg| {
+        self.system_conn.add_match(manager_rule, move |changed: PropertiesPropertiesChanged, conn, _msg| {
             if changed.interface_name == iface
                 && changed.changed_properties.contains_key("OnBattery")
             {
-                let _ = Self::get_power_source_data(dest, path, iface, &watched_path, conn)
+                let _ = Self::get_power_source_data(dest, path, iface, device_iface, &watched_path, conn)
                     .map(|(battery_or_ac, has_battery, state)| {
                         (value.lock().unwrap())(battery_or_ac, has_battery, state);
                     })
@@ -254,13 +264,13 @@ pub(crate) struct DBus {
 
         let watched_path = device_path.clone();
         let value = on_dpms_power_source.clone();
-        self.conn.add_match(device_rule, move |changed: PropertiesPropertiesChanged, conn, _msg| {
-            if changed.interface_name == iface
+        self.system_conn.add_match(device_rule, move |changed: PropertiesPropertiesChanged, conn, _msg| {
+            if changed.interface_name == device_iface
                 && (changed.changed_properties.contains_key("IsPresent")
                     || changed.changed_properties.contains_key("Type")
                     || changed.changed_properties.contains_key("State"))
             {
-                let _ = Self::get_power_source_data(dest, path, iface, &watched_path, conn)
+                let _ = Self::get_power_source_data(dest, path, iface, device_iface, &watched_path, conn)
                     .map(|(battery_or_ac, has_battery, state)| {
                         (value.lock().unwrap())(battery_or_ac, has_battery, state);
                     })
@@ -284,6 +294,17 @@ pub(crate) struct DBus {
                 loop {
                     if let Err(e) = conn.process(Self::TIMEOUT) {
                         log.syslog(Priority::LogWarning, &format!("dbus process error: {e}"));
+                    }
+                }
+            })?;
+
+        let system_conn = self.system_conn.clone();
+
+        self.system_thread.spawn(None,move |_, _| {
+                let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
+                loop {
+                    if let Err(e) = system_conn.process(Self::TIMEOUT) {
+                        log.syslog(Priority::LogWarning, &format!("dbus system process error: {e}"));
                     }
                 }
             })?;
