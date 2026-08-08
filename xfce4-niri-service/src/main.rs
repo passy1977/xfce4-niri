@@ -32,6 +32,7 @@ mod autostart;
 mod brightness;
 mod data;
 mod dbus;
+mod desktop_entry;
 mod lock_screen;
 mod os;
 

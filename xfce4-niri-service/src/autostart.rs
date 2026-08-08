@@ -21,16 +21,38 @@
 use std::collections::HashMap;
 use std::env::{self};
 use std::ffi::c_int;
+// use std::ffi::c_int;
 use std::path::Path;
-use std::process::{Child};
+use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
 use osal_rs::os::{Mutex, MutexFn, System, Thread, ThreadFn};
-use osal_rs::utils::{Result};
+use osal_rs::utils::{Error, Result};
 
 use crate::data::{Data, XDG_AUTOSTART};
+use crate::desktop_entry::{DESKTOP_SUFFIX, DesktopEntry, current_desktops};
 use crate::os::syslog::{Options, Priority, SysLog};
+// use crate::os::syslog::{Options, Priority, SysLog};
+
+macro_rules! merge_autostart {
+    ($locale:expr, $merge:expr, $autostart:expr) => {{
+        for (_, path) in $autostart {
+            let entry = DesktopEntry::read(&path)?;
+            
+            let name = entry.localized("Name", $locale);
+            let name = match name {
+                Some(name) => name,
+                None => continue
+            };
+
+            $merge.remove(&name);
+            $merge.insert(name, entry);
+        }
+    }};
+}
+
+
 
 pub(crate) struct AutostartData {
     xdg_autostart:  HashMap<String, String>,
@@ -57,8 +79,6 @@ pub(crate) struct Autostart {
 impl Autostart {
 
     const APP_TAG: &str = "Autostart";
-    const DESKTOP_SUFFIX: &str = ".desktop";
-
 
     const REAP_INTERVAL: Duration = Duration::from_secs(30);
 
@@ -88,62 +108,73 @@ impl Autostart {
                 .to_string()
             )
         )
-        .filter(|(file_name, _)| file_name.ends_with(Self::DESKTOP_SUFFIX))
+        .filter(|(file_name, _)| file_name.ends_with(DESKTOP_SUFFIX))
         .collect())
     }
 
-    // fn execute(entry: &DesktopEntry) -> Result<Child> {
-    //
-    //     let argv = entry.exec_argv();
-    //
-    //     let Some((program, args)) = argv.split_first() else {
-    //         return Err(Error::Unhandled("Exec key missing or empty"))
-    //     };
-    //
-    //     Command::new(program)
-    //         .args(args)
-    //         .stdin(Stdio::null())
-    //         .stdout(Stdio::null())
-    //         .stderr(Stdio::null())
-    //         .spawn()
-    //         .map_err(|e| Error::UnhandledOwned(e.to_string()))
-    // }
+    fn execute(entry: &DesktopEntry, desktops: &Vec<String>) -> Result<Child> {
+    
+        let argv = entry.exec_argv();
+
+        if let Err(_) = entry.should_autostart(desktops) {
+            return Err(Error::NotFound)
+        }
+
+        let Some((program, args)) = argv.split_first() else {
+            return Err(Error::Unhandled("Exec key missing or empty"))
+        };
+
+        Command::new(program)
+            .args(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| Error::UnhandledOwned(e.to_string()))
+    }
 
     pub(super) fn start(&mut self) -> Result<()>{
 
+        
+        self.data.lock()?.xdg_autostart = Self::read_autostart(XDG_AUTOSTART)?;
+        self.data.lock()?.local_autostart = Self::read_autostart(&Data::share().xdg_home_autostart)?;
     
-        let mut data = self.data.lock()?;
-
-        data.xdg_autostart = Self::read_autostart(XDG_AUTOSTART)?;
-        data.local_autostart = Self::read_autostart(&Data::share().xdg_home_autostart)?;
-    
-
-        let self_data = self.data.clone();
-
+        let data = self.data.clone();
         self.thread.spawn_simple(move || {
 
+            let xdg_autostart = data.lock()?.xdg_autostart.clone();
+            let local_autostart = data.lock()?.local_autostart.clone();
             
 
+            let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
-            let lang = env::var("LANG").unwrap_or_else(|e| {
+            let locale = env::var("LANG").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
 
-                let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
+            let mut merge = HashMap::<String, DesktopEntry>::new(); 
 
-                log.syslog(Priority::LogWarning, &e.to_string());
+            merge_autostart!(&locale, &mut merge, &xdg_autostart);
+            merge_autostart!(&locale, &mut merge, &local_autostart);
 
+            let desktops = current_desktops();
 
-                String::new()
-            });
-
-            let lang = env::var("LANG").unwrap_or_else(|e| {
-            if lang.rsplit('_') {
-
+            data.lock()?.children.clear();
+            for (name, entry) in merge {                
+                
+                let child = Self::execute(&entry, &desktops);
+                if let Err(_e  @ Error::NotFound) = child {
+                    log.syslog_with_tag(Self::APP_TAG, Priority::LogDebug, &format!("Start: {name} - {:?} - skip", &entry.exec_argv()));
+                    continue
+                } if let Err(e) = child {
+                    return Err(e)
+                } 
+                log.syslog_with_tag(Self::APP_TAG, Priority::LogDebug, &format!("Start: {name} - {:?} - ok", &entry.exec_argv()));
+                data.lock()?.children.push(child.unwrap());
             }
 
             loop {
                 System::delay_with_to_tick(Self::REAP_INTERVAL);
 
-                let Ok(mut data) = self_data.lock() else {
+                let Ok(mut data) = data.lock() else {
                     continue
                 };
 
