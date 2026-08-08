@@ -18,6 +18,7 @@
  *
  ***************************************************************************/
 
+use std::ffi::c_int;
 use std::fs::read_to_string;
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
@@ -29,6 +30,7 @@ use osal_rs::utils::{Error, Result};
 
 use crate::data::Data;
 use crate::dbus::DBus;
+use crate::os::syslog::{Options, Priority, SysLog};
 
 
 static mut EVENT_GROUP: Option<EventGroup> = None;
@@ -84,12 +86,14 @@ macro_rules! update_power_manager_data {
 
 impl LockScreen {
 
+    const APP_TAG: &str = "Autostart";
+
     const XFCE4_PM_CHANNEL: &str = "xfce4-power-manager";
     const XFCE4_PM_PROPERTY_PRESENTATION_MODE: &str = "/xfce4-power-manager/presentation-mode";
     const XFCE4_PM_PROPERTY_DPMS_ENABLED: &str = "/xfce4-power-manager/dpms-enabled";
     const XFCE4_PM_PROPERTY_DPMS_ON_AC_SLEEP: &str = "/xfce4-power-manager/dpms-on-ac-sleep";
     const XFCE4_PM_PROPERTY_DPMS_ON_AC_OFF: &str = "/xfce4-power-manager/dpms-on-ac-off";
-    const XFCE4_PM_PROPERTY_DPMS_ON_BATTERY_SLEEP: &str = "/xfce4-power-manager/dpms-on-battery-sleep";
+    // const XFCE4_PM_PROPERTY_DPMS_ON_BATTERY_SLEEP: &str = "/xfce4-power-manager/dpms-on-battery-sleep";
     const XFCE4_PM_PROPERTY_DPMS_ON_BATTERY_OFF: &str = "/xfce4-power-manager/dpms-on-battery-off";
 
     const UPOWER_DEST: &str = "org.freedesktop.UPower";
@@ -330,6 +334,9 @@ impl LockScreen {
             off_in_minutes = sleep_in_minutes.saturating_add(2 * Self::ONE_MINUTE);
         }
 
+        let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
+
+
         let mut child = Command::new(&Data::share().lock_screen_file)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -339,6 +346,9 @@ impl LockScreen {
 
         let pid = child.id();
         println!("lock screen pid: {pid}");
+
+        log.syslog_with_tag(Self::APP_TAG, Priority::LogInfo, &format!("lock screen pid: {pid}"));
+
 
         let Ok(exit_status) = child.wait() else {
             return Err(Error::Unhandled("Failed to wait for command"))
