@@ -11,7 +11,9 @@
                     "--package",
                     "xfce4-niri-service",
                     "--bin",
-                    "xfce4-niri-service"
+                    "xfce4-niri-service",
+                    "-F",
+                    "disable_autostart"
                 ],
                 "filter": {
                     "name": "xfce4-niri-service",

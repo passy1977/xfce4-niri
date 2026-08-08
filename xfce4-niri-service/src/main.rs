@@ -18,16 +18,7 @@
  *
  ***************************************************************************/
 
-use std::{error::Error, ffi::c_int};
-
-use osal_rs::os::{System, SystemFn};
-use crate::autostart::Autostart;
-use crate::data::Data;
-use crate::dbus::DBus;
-use crate::brightness::Brightness;
-use crate::lock_screen::LockScreen;
-use crate::os::syslog::{Options, Priority, SysLog};
-
+#[cfg(not(feature = "disable_autostart"))]
 mod autostart;
 mod brightness;
 mod data;
@@ -37,6 +28,18 @@ mod lock_screen;
 mod os;
 
 extern crate osal_rs;
+
+use std::{error::Error, ffi::c_int};
+
+use osal_rs::os::{System, SystemFn};
+#[cfg(not(feature = "disable_autostart"))]
+use crate::autostart::Autostart;
+use crate::data::Data;
+use crate::dbus::DBus;
+use crate::brightness::Brightness;
+use crate::lock_screen::LockScreen;
+use crate::os::syslog::{Options, Priority, SysLog};
+
 
 fn main() -> Result<(), Box<dyn Error>> {
 
@@ -69,6 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(msg.into());
     }
     
+    #[cfg(not(feature = "disable_autostart"))]
     if let Err(e) = Autostart::new().start() {
         let msg = e.to_string();
         log.syslog(Priority::LogCrit, &msg);

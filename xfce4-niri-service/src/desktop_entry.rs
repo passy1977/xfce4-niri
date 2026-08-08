@@ -18,7 +18,10 @@
  *
  ***************************************************************************/
 
-use std::collections::HashMap;
+#![cfg(not(feature = "disable_autostart"))]
+#![allow(dead_code)]
+
+use std::{collections::HashMap};
 use std::env;
 use std::fs::read_to_string;
 use std::path::Path;

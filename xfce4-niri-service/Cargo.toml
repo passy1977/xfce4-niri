@@ -20,6 +20,9 @@ exclude = [
     "*.swo",
 ]
 
+[features]
+disable_autostart = []
+
 [dependencies]
 osal-rs = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["posix", "serde"]}
 osal-rs-serde = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["derive"]}
