@@ -32,8 +32,7 @@ use osal_rs::utils::{Error, Result};
 
 use crate::data::{Data, XDG_AUTOSTART};
 use crate::desktop_entry::{DESKTOP_SUFFIX, DesktopEntry, current_desktops};
-use crate::os::syslog::{Options, Priority, SysLog};
-// use crate::os::syslog::{Options, Priority, SysLog};
+use crate::syslog::{Options, Priority, SysLog};
 
 macro_rules! merge_autostart {
     ($locale:expr, $merge:expr, $autostart:expr) => {{

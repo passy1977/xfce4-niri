@@ -30,7 +30,7 @@ use dbus::message::SignalArgs;
 use osal_rs::os::{Thread, ThreadFn, Mutex, MutexFn};
 use osal_rs::utils::{Error, Result};
 
-use crate::os::syslog::{Options, Priority, SysLog};
+use crate::syslog::{Options, Priority, SysLog};
 
 macro_rules! handle_power_source_error {
     ($msg:expr) => {{

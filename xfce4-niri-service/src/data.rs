@@ -30,7 +30,7 @@ use osal_rs::utils::{Error, Result};
 use osal_rs_serde::{Deserialize, Serialize};
 
 use crate::brightness::BrightnessData;
-use crate::os::syslog::{Options, Priority, SysLog};
+use crate::syslog::{Options, Priority, SysLog};
 
 
 static mut DATA: Option<Data> = None;

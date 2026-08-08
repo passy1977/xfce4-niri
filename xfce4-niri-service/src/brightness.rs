@@ -30,7 +30,7 @@ use osal_rs::utils::{Error, Result};
 use osal_rs_serde::{Deserialize, Serialize};
 
 use crate::data::Data;
-use crate::os::syslog::{Options, Priority, SysLog};
+use crate::syslog::{Options, Priority, SysLog};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct BrightnessData {

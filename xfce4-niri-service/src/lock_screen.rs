@@ -30,7 +30,7 @@ use osal_rs::utils::{Error, Result};
 
 use crate::data::Data;
 use crate::dbus::DBus;
-use crate::os::syslog::{Options, Priority, SysLog};
+use crate::syslog::{Options, Priority, SysLog};
 
 
 static mut EVENT_GROUP: Option<EventGroup> = None;

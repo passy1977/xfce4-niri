@@ -25,7 +25,7 @@ mod data;
 mod dbus;
 mod desktop_entry;
 mod lock_screen;
-mod os;
+mod syslog;
 
 extern crate osal_rs;
 
@@ -38,7 +38,7 @@ use crate::data::Data;
 use crate::dbus::DBus;
 use crate::brightness::Brightness;
 use crate::lock_screen::LockScreen;
-use crate::os::syslog::{Options, Priority, SysLog};
+use crate::syslog::{Options, Priority, SysLog};
 
 
 fn main() -> Result<(), Box<dyn Error>> {
