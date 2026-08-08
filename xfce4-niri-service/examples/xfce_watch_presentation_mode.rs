@@ -42,17 +42,18 @@
 use std::error::Error;
 use std::time::Duration;
 
+use dbus::Message;
 use dbus::arg::{self, RefArg, Variant};
 use dbus::blocking::Connection;
-use dbus::Message;
+use dbus::message::SignalArgs;
 
 const TIMEOUT: Duration = Duration::from_millis(5000);
 
 const XFCONF_DEST: &str = "org.xfce.Xfconf";
 const XFCONF_PATH: &str = "/org/xfce/Xfconf";
+const XFCONF_IFACE: &str = "org.xfce.Xfconf";
 const CHANNEL: &str = "xfce4-power-manager";
 const PROPERTY: &str = "/presentation-mode";
-const SIGNAL_PROPERTY: &str = "/xfce4-power-manager/presentation-mode";
 
 /// `org.xfce.Xfconf.PropertyChanged(channel, property, value)` - Xfconf's
 /// own change-notification signal.
@@ -73,6 +74,14 @@ impl arg::ReadAll for XfconfPropertyChanged {
     }
 }
 
+/// Which signal the struct above stands for. `match_signal` needs this to
+/// build the match rule it installs on the bus; `ReadAll` alone only says
+/// how to decode the arguments once a message has arrived.
+impl SignalArgs for XfconfPropertyChanged {
+    const NAME: &'static str = "PropertyChanged";
+    const INTERFACE: &'static str = XFCONF_IFACE;
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let conn = Connection::new_session()?;
 
@@ -87,16 +96,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     // though the channel itself is fine - that's not a reason to give up on
     // watching for a future change.
     let initial: Result<(Variant<Box<dyn RefArg>>,), _> =
-        xfconf.method_call("org.xfce.Xfconf", "GetProperty", (CHANNEL, PROPERTY));
+        xfconf.method_call(XFCONF_IFACE, "GetProperty", (CHANNEL, PROPERTY));
     match initial {
         Ok((value,)) => println!("[{CHANNEL}]{PROPERTY} = {:?} (initial value)", value.0),
         Err(e) => println!("[{CHANNEL}]{PROPERTY} not set yet ({e})"),
     }
 
-
-
+    // The signal splits the channel out into its own argument, so `property`
+    // carries the same bare name that was passed to GetProperty above - it is
+    // not prefixed with the channel.
     xfconf.match_signal(|signal: XfconfPropertyChanged, _: &Connection, _: &Message| {
-        if signal.channel == CHANNEL && signal.property == SIGNAL_PROPERTY {
+        if signal.channel == CHANNEL && signal.property == PROPERTY {
             println!("[{}]{} = {:?} (changed)", signal.channel, signal.property, signal.value.0);
         }
         true

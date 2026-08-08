@@ -61,8 +61,10 @@
 use std::error::Error;
 use std::time::Duration;
 
-use dbus::blocking::stdintf::org_freedesktop_dbus::{Properties, PropertiesPropertiesChanged};
 use dbus::blocking::Connection;
+use dbus::blocking::stdintf::org_freedesktop_dbus::{Properties, PropertiesPropertiesChanged};
+// Brings `match_rule` into scope on PropertiesPropertiesChanged below.
+use dbus::message::SignalArgs;
 
 const TIMEOUT: Duration = Duration::from_millis(5000);
 
