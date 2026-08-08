@@ -18,8 +18,9 @@
  *
  ***************************************************************************/
 
-use std::fs::{DirEntry, File};
+use std::fs::{DirEntry, File, OpenOptions};
 use std::io::{Read, Write};
+use std::os::fd::AsRawFd;
 use std::os::unix::fs::PermissionsExt;
 use std::{fs, path::Path};
 use std::env;
@@ -30,8 +31,14 @@ use osal_rs::utils::{Error, Result};
 use osal_rs_serde::{Deserialize, Serialize};
 
 use crate::brightness::BrightnessData;
+use crate::data::ffi::getuid;
 use crate::syslog::{Options, Priority, SysLog};
 
+mod ffi {
+    use std::ffi::{c_int, c_uint};
+    unsafe extern "C" { pub(super) fn flock(fd: c_int, operation: c_int) -> c_int; }
+    unsafe extern "C" { pub(super) fn getuid() -> c_uint; }
+}
 
 static mut DATA: Option<Data> = None;
 pub(crate) const XDG_AUTOSTART: &str = "/etc/xdg/autostart";
@@ -54,10 +61,9 @@ pub(crate) struct Data {
     #[allow(dead_code)]
     user_home: String,
     pub(crate) niri_file: String,
-    pub(crate) niri_d_folder: String,
     pub(crate) xdg_home_autostart: String,
     pub(crate) brightness_file: String,
-    pub(crate) lock_screen_file: String
+    pub(crate) lock_screen_file: String,
 }
 
 
@@ -65,6 +71,9 @@ impl Data {
 
     const APP_TAG: &str = "Data";
     const IO_BUFFER_SIZE: usize = 256;
+
+    const LOCK_EX: c_int = 2;
+    const LOCK_NB: c_int = 4;
 
     pub(crate) fn share() -> &'static Self {
 
@@ -98,9 +107,6 @@ impl Data {
                 let mut niri_file = config.clone();
                 niri_file.push_str("niri/config.kdl");
 
-                let mut niri_d_folder = config.clone();
-                niri_d_folder.push_str("niri/niri.d");
-
                 let mut xdg_home_autostart = home.clone();
                 xdg_home_autostart.push_str("/.config/autostart");
 
@@ -113,7 +119,6 @@ impl Data {
                 let data = Self { 
                     user_home: home, 
                     niri_file, 
-                    niri_d_folder, 
                     xdg_home_autostart, 
                     brightness_file,
                     lock_screen_file
@@ -137,7 +142,6 @@ impl Data {
     pub(crate) fn check_persistence(&self) -> Result<(), String> {
         let elements = [
             (self.niri_file.clone(), true, format!("Niri config file not found: {}", self.niri_file)),
-            (self.niri_d_folder.clone(), true,format!("Niri config folder not found: {}", self.niri_d_folder)),
             (String::from_str(XDG_AUTOSTART).unwrap_or_default(), true, format!("XDG autostart folder not found: {XDG_AUTOSTART}")),
             (self.xdg_home_autostart.clone(), false, format!("XDG home autostart folder not found: {}", self.xdg_home_autostart)),
             (self.lock_screen_file.clone(), false, format!("Lock screen file not found: {}", self.lock_screen_file)),
@@ -259,5 +263,30 @@ impl Data {
         Self::read_file::<BrightnessData>(&self.brightness_file)
     }
     
+    pub(crate) fn acquire_single_instance_lock() -> Result<File> {
+        let dir = env::var("XDG_RUNTIME_DIR")
+            .unwrap_or_else(|_| format!("/tmp/xfce4-niri-{}", unsafe { getuid() }));
+        let lock_file = format!("{dir}/xfce4-niri-service.lock");
 
+        let file = OpenOptions::new().create(true).read(true).write(true).open(&lock_file)
+            .map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+
+        if unsafe { ffi::flock(file.as_raw_fd(), Self::LOCK_EX | Self::LOCK_NB) } != 0 {
+            return Err(Error::UnhandledOwned("another instance is already running".into()));
+        }
+
+        Ok(file)
+    }
+
+}
+
+impl Drop for Data {
+    fn drop(&mut self) {
+
+        let dir = env::var("XDG_RUNTIME_DIR")
+            .unwrap_or_else(|_| format!("/tmp/xfce4-niri-{}", unsafe { getuid() }));
+        let path = format!("{dir}/xfce4-niri-service.lock");
+
+        let _ = fs::remove_file(path);
+    }
 }

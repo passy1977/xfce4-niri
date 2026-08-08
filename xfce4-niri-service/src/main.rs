@@ -45,6 +45,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
+    let _lock = match Data::acquire_single_instance_lock() {
+        Ok(lock) => lock,
+        Err(e) => {
+            let msg = e.to_string();
+            log.syslog(Priority::LogInfo, &msg);
+            return Err(msg.into());
+        }
+    };
+
     if let Err(e) = Data::share().check_persistence() {
         let msg = e.to_string();
         log.syslog(Priority::LogCrit, &msg);
