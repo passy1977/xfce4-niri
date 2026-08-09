@@ -25,10 +25,10 @@ mod data;
 mod dbus;
 mod desktop_entry;
 mod lock_screen;
-mod niri_check;
-mod syslog;
+//mod syslog;
 
 extern crate osal_rs;
+extern crate xfce4_niri_lib;
 
 use std::{error::Error, ffi::c_int};
 
@@ -39,8 +39,8 @@ use crate::data::Data;
 use crate::dbus::DBus;
 use crate::brightness::Brightness;
 use crate::lock_screen::LockScreen;
-use crate::niri_check::NiriCheck;
-use crate::syslog::{Options, Priority, SysLog};
+use xfce4_niri_lib::niri_check::NiriCheck;
+use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 
 fn main() -> Result<(), Box<dyn Error>> {

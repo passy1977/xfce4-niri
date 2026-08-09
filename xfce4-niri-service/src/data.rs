@@ -32,7 +32,7 @@ use osal_rs_serde::{Deserialize, Serialize};
 
 use crate::brightness::BrightnessData;
 use crate::data::ffi::getuid;
-use crate::syslog::{Options, Priority, SysLog};
+use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 mod ffi {
     use std::ffi::{c_int, c_uint};

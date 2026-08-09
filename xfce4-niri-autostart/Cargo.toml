@@ -1,5 +1,5 @@
 [package]
-name = "xfce4-niri-service"
+name = "xfce4-niri-autostart"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85.0"
@@ -12,19 +12,9 @@ documentation = "https://docs.rs/xfce4-niri"
 readme = "../README.md"
 keywords = ["niri", "xfce4", "embedded", "posix"]
 
-exclude = [
-    "target/",
-    ".git/",
-    ".github/",
-    "*.swp",
-    "*.swo",
-]
-
-[features]
-disable_autostart = []
-
 [dependencies]
 xfce4-niri-lib = { version = "0", path = "../xfce4-niri-lib" }
 osal-rs = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["posix", "serde"]}
 osal-rs-serde = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["derive"]}
-dbus = "0.9.12"
+gtk = { version = "0.18", features = ["v3_24"] }
+

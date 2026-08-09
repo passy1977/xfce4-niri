@@ -2,6 +2,26 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Debug xfce4-niri-autostart",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--package",
+                    "xfce4-niri-autostart",
+                    "--bin",
+                    "xfce4-niri-autostart"
+                ],
+                "filter": {
+                    "name": "xfce4-niri-autostart",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
             "name": "Debug xfce4-niri-service",
             "type": "lldb",
             "request": "launch",

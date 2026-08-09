@@ -24,7 +24,7 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::time::Duration;
 
-pub(crate) struct NiriCheck;
+pub struct NiriCheck;
 
 impl NiriCheck {
 

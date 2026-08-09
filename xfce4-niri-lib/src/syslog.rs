@@ -21,7 +21,7 @@
 use std::ffi::{c_int, CStr, CString};
 
 #[allow(unused)]
-pub(crate) enum Options {
+pub enum Options {
 
     LogPid = 0x01,
     LogCons = 0x02,
@@ -34,7 +34,7 @@ enum Facility {
 }
 
 #[allow(unused)]
-pub(crate) enum Priority {
+pub enum Priority {
     LogEmerg = 0,
     LogAlert = 1,
     LogCrit = 2,
@@ -55,7 +55,7 @@ pub(super)  mod ffi {
     }
 }
 
-pub(crate) struct SysLog;
+pub struct SysLog;
 
 impl Drop for SysLog {
     fn drop(&mut self) {
@@ -67,14 +67,14 @@ impl SysLog {
 
     const APP_TAG: &CStr = c"xfce4-niri-service";
 
-    pub(crate) fn open(option: c_int) -> Self {
+    pub fn open(option: c_int) -> Self {
         unsafe {
             ffi::openlog(Self::APP_TAG.as_ptr(), option, Facility::LogUser as c_int);
         }
         Self
     }
 
-    pub(crate) fn syslog(&self, priority: Priority, msg: &str) {
+    pub fn syslog(&self, priority: Priority, msg: &str) {
         let Ok(msg) = CString::new(msg) else {
             return
         };
@@ -84,7 +84,7 @@ impl SysLog {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn syslog_with_tag(&self, tag: &str, priority: Priority, msg: &str) {
+    pub fn syslog_with_tag(&self, tag: &str, priority: Priority, msg: &str) {
         let Ok(tag) = CString::new(tag) else {
             return
         }; 
@@ -99,7 +99,7 @@ impl SysLog {
     }
 
 
-    pub(crate) fn close(&mut self) {
+    pub fn close(&mut self) {
         unsafe {
             ffi::closelog();
         }
