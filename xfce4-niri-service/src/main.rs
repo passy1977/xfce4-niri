@@ -65,8 +65,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
     
-    log.syslog(Priority::LogCrit, &format!("Version {}", env!("CARGO_PKG_VERSION")));
-    log.syslog(Priority::LogCrit, &format!("Niri {} running", version));
+    log.syslog(Priority::LogDebug, &format!("Version {}", env!("CARGO_PKG_VERSION")));
+    log.syslog(Priority::LogDebug, &format!("Niri {} running", version));
 
     if let Err(e) = Data::share().check_persistence() {
         let msg = e.to_string();

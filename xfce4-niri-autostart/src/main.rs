@@ -40,6 +40,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             return Err(msg.into())
         }
     };
+    log.syslog(Priority::LogDebug, &format!("Version {}", env!("CARGO_PKG_VERSION")));
+    log.syslog(Priority::LogDebug, &format!("Niri {} running", version));
 
     
     println!("version {version}");
