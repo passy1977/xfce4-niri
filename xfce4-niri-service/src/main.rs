@@ -25,6 +25,7 @@ mod data;
 mod dbus;
 mod desktop_entry;
 mod lock_screen;
+mod niri_check;
 mod syslog;
 
 extern crate osal_rs;
@@ -38,6 +39,7 @@ use crate::data::Data;
 use crate::dbus::DBus;
 use crate::brightness::Brightness;
 use crate::lock_screen::LockScreen;
+use crate::niri_check::NiriCheck;
 use crate::syslog::{Options, Priority, SysLog};
 
 
@@ -45,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
-    let _lock = match Data::acquire_single_instance_lock() {
+    let _ = match Data::acquire_single_instance_lock() {
         Ok(lock) => lock,
         Err(e) => {
             let msg = e.to_string();
@@ -53,6 +55,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             return Err(msg.into());
         }
     };
+
+    let version = match NiriCheck::version() {
+        Some(version) => version,
+        None => {
+            let msg = "Niri not ruining";
+            log.syslog(Priority::LogCrit, &msg);
+            return Err(msg.into())
+        }
+    };
+    
+    log.syslog(Priority::LogCrit, &format!("Version {}", env!("CARGO_PKG_VERSION")));
+    log.syslog(Priority::LogCrit, &format!("Niri {} running", version));
 
     if let Err(e) = Data::share().check_persistence() {
         let msg = e.to_string();
