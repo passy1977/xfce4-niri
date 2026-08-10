@@ -21,11 +21,16 @@
 extern crate osal_rs;
 extern crate xfce4_niri_lib;
 
+mod data;
+mod gui;
+
 use std::error::Error;
 use std::ffi::c_int;
 
 use xfce4_niri_lib::niri_check::NiriCheck;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
+
+use crate::data::Data;
 
 fn main() -> Result<(), Box<dyn Error>> {
 
@@ -43,8 +48,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     log.syslog(Priority::LogDebug, &format!("Version {}", env!("CARGO_PKG_VERSION")));
     log.syslog(Priority::LogDebug, &format!("Niri {} running", version));
 
-    
-    println!("version {version}");
+    if let Err(e) = Data::share().check_persistence() {
+        let msg = e.to_string();
+        log.syslog(Priority::LogCrit, &msg);
+        return Err(msg.into());
+    }
 
     Ok(())
 }
