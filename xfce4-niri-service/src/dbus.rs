@@ -109,39 +109,6 @@ pub(crate) struct DBus {
         })
     }
 
-
-    fn private_register_xfce4_power_manager_signal<T: FromRefArg + Default>(&self, channel: &str, property: &str, on_change: Arc<Mutex<impl FnMut(T) + Send + 'static>>) -> Result<()> {
-
-        let signal_property: String = property.to_owned();
-
-        let xfconf = self.xfce4_power_manager_conn.with_proxy(Self::DEST, Self::PATH, Self::TIMEOUT);
-
-        let initial: T = match xfconf.method_call::<(Variant<Box<dyn RefArg>>,), _, _, _>("org.xfce.Xfconf", "GetProperty", (channel, property)) {
-            Ok((value,)) => T::from_refarg(&*value.0).unwrap_or_default(),
-            Err(e) => {
-                handle_power_source_error!(&format!("[{channel}]{property} not set yet ({e})"));
-                T::default()
-            }
-        };
-        (on_change.lock().unwrap())(initial);
-
-
-        let on_change = on_change.clone();
-        let channel = channel.to_owned();
-
-        xfconf.match_signal(move |signal: XFConfPropertyChanged, _: &SyncConnection, _: &Message| {
-
-            if signal.channel == channel && signal.property == signal_property {
-                if let Some(value) = T::from_refarg(&*signal.value.0) {
-                    (on_change.lock().unwrap())(value);
-                }
-            }
-            true
-        }).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-
-        Ok(())
-    }
-
     fn get_power_source_data(
         dest: &str,
         path: &str,
@@ -174,7 +141,34 @@ pub(crate) struct DBus {
         property: &str,
         on_change: Arc<Mutex<impl FnMut(T) + Send + 'static>>
     ) -> Result<()> {
-        self.private_register_xfce4_power_manager_signal(channel, property, on_change)
+        let signal_property: String = property.to_owned();
+
+        let xfconf = self.xfce4_power_manager_conn.with_proxy(Self::DEST, Self::PATH, Self::TIMEOUT);
+
+        let initial: T = match xfconf.method_call::<(Variant<Box<dyn RefArg>>,), _, _, _>("org.xfce.Xfconf", "GetProperty", (channel, property)) {
+            Ok((value,)) => T::from_refarg(&*value.0).unwrap_or_default(),
+            Err(e) => {
+                handle_power_source_error!(&format!("[{channel}]{property} not set yet ({e})"));
+                T::default()
+            }
+        };
+        (on_change.lock().unwrap())(initial);
+
+
+        let on_change = on_change.clone();
+        let channel = channel.to_owned();
+
+        xfconf.match_signal(move |signal: XFConfPropertyChanged, _: &SyncConnection, _: &Message| {
+
+            if signal.channel == channel && signal.property == signal_property {
+                if let Some(value) = T::from_refarg(&*signal.value.0) {
+                    (on_change.lock().unwrap())(value);
+                }
+            }
+            true
+        }).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+
+        Ok(())
     }
 
 

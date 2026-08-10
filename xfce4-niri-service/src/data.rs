@@ -59,7 +59,6 @@ macro_rules! get_env_full_path {
 #[derive(Default, Clone)]
 pub(crate) struct Data {
     #[allow(dead_code)]
-    user_home: String,
     pub(crate) niri_file: String,
     pub(crate) xdg_home_autostart: String,
     pub(crate) brightness_file: String,
@@ -117,7 +116,6 @@ impl Data {
                 lock_screen_file.push_str("niri/bin/lock_screen");
 
                 let data = Self { 
-                    user_home: home, 
                     niri_file, 
                     xdg_home_autostart, 
                     brightness_file,
@@ -259,6 +257,7 @@ impl Data {
         Self::write_file(&self.brightness_file, &value)
     }
 
+    #[inline]
     pub(crate) fn read_brightness(&self) -> Result<Box<BrightnessData>>  {
         Self::read_file::<BrightnessData>(&self.brightness_file)
     }
