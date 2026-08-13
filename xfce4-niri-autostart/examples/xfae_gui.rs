@@ -867,9 +867,9 @@ fn xfae_window_new() -> gtk::Box {
 
     // Both buttons follow the selection, as in `xfae_window_init`.
     selection.connect_changed(glib::clone!(@weak remove, @weak edit => move |selection| {
-        xfae_window_selection_changed(selection, &[&remove, &edit]);
+        xfae_window_selection_changed(selection, &remove, &edit);
     }));
-    xfae_window_selection_changed(&selection, &[&remove, &edit]);
+    xfae_window_selection_changed(&selection, &remove, &edit);
 
     vbox
 }
@@ -1043,17 +1043,29 @@ fn xfae_window_item_toggled(model: &gtk::ListStore, path: &gtk::TreePath) {
     model.set_value(&iter, col::ENABLED, &(!enabled).to_value());
 }
 
-/// Port of `xfae_window_selection_changed`: only a removable entry can be
-/// acted on.
-fn xfae_window_selection_changed(selection: &gtk::TreeSelection, buttons: &[&gtk::Button]) {
+/// Port of `xfae_window_selection_changed`: Remove asks for an entry every copy
+/// of which sits in a writable directory, which in practice means one the user
+/// owns under `~/.config/autostart`.
+///
+/// The C code connects this handler to the Edit button as well, so upstream
+/// Edit is greyed out on every system wide entry too — the vast majority of the
+/// list. Here Edit only asks for a selected row: the entry is opened read only
+/// anyway, and its `Exec` is worth looking at even when the file cannot be
+/// rewritten in place.
+fn xfae_window_selection_changed(
+    selection: &gtk::TreeSelection,
+    remove: &gtk::Button,
+    edit: &gtk::Button,
+) {
 
-    let removable = selection
-        .selected()
-        .is_some_and(|(model, iter)| cell_bool(&model, &iter, col::REMOVABLE));
+    let selected = selection.selected();
 
-    for button in buttons {
-        button.set_sensitive(removable);
-    }
+    let removable = selected
+        .as_ref()
+        .is_some_and(|(model, iter)| cell_bool(model, iter, col::REMOVABLE));
+
+    remove.set_sensitive(removable);
+    edit.set_sensitive(selected.is_some());
 }
 
 fn cell_string(model: &impl IsA<gtk::TreeModel>, iter: &gtk::TreeIter, column: u32) -> String {
