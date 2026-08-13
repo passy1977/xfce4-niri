@@ -27,10 +27,17 @@ mod gui;
 use std::error::Error;
 use std::ffi::c_int;
 
+use gtk::Application;
+use gtk::gio::prelude::ApplicationExtManual;
+use gtk::gio::traits::ApplicationExt;
+use gtk::traits::{WidgetExt, ContainerExt};
 use xfce4_niri_lib::niri_check::NiriCheck;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 use crate::data::Data;
+use crate::gui::Gui;
+
+const APP_ID: &str = "it.salsi.xfce-niri.AutoStart";
 
 fn main() -> Result<(), Box<dyn Error>> {
 
@@ -54,5 +61,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(msg.into());
     }
 
+    let app = Application::builder()
+        .application_id(APP_ID)
+        .build();
+
+
+    app.connect_activate(&build_ui);
+
+    app.run_with_args::<&str>(&[]);
+
     Ok(())
+}
+
+fn build_ui(app: &gtk::Application) {
+
+    let window = gtk::ApplicationWindow::builder()
+        .application(app)
+        .title("Xfce4-niri Autostart")
+        .default_width(600)
+        .default_height(450)
+        .build();
+
+    window.add(&Gui::window_new());
+    window.show_all();
 }
