@@ -25,3 +25,4 @@ target
 /target
 Cargo.lock
 *.txt
+xfce4-niri-autostart/APPLICATION_AUTOSTART_CODE.md
