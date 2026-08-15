@@ -17,6 +17,9 @@
  * License along with this library; if not, see <https://www.gnu.org/licenses/>.
  *
  ***************************************************************************/
+#![allow(dead_code)]
+#![allow(unused)]
+
 use gtk::gio::Icon;
 use gtk::{Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ScrolledWindow, SelectionMode, ShadowType, TreeViewColumn};
 use gtk::glib;
@@ -56,7 +59,7 @@ mod col {
     let model = Self::model_new();
 
     let tree_view = gtk::TreeView::builder()
-        // .model(&model)
+        .model(&model)
         .headers_visible(true)
         .tooltip_column(col::TOOLTIP as i32)
         .build();
@@ -71,7 +74,7 @@ mod col {
 
     let column = TreeViewColumn::builder().reorderable(false).resizable(false).build();
     let renderer = CellRendererToggle::new();
-    renderer.connect_toggled(glib::clone!(@weak model => move |_, path| {
+    renderer.connect_toggled(glib::clone!(@weak model => move |_, _path| {
         //TODO: to handle
         //xfae_window_item_toggled(&model, &path);
     }));
@@ -110,7 +113,7 @@ mod col {
         .editable(true)
         .mode(CellRendererMode::Editable)
         .build();
-    renderer.connect_changed(glib::clone!(@weak model => move |combo, path, combo_iter| {
+    renderer.connect_changed(glib::clone!(@weak model => move |_combo, _path, _combo_iter| {
         //TODO: to handle
         //run_hook_changed(&model, combo, &path, combo_iter);
     }));
@@ -147,7 +150,7 @@ mod col {
     bbox.pack_start(&edit, false, false, 0);
 
     // Both buttons follow the selection, as in `xfae_window_init`.
-    selection.connect_changed(glib::clone!(@weak remove, @weak edit => move |selection| {
+    selection.connect_changed(glib::clone!(@weak remove, @weak edit => move |_selection| {
         //TODO: to handle
         // xfae_window_selection_changed(selection, &remove, &edit);
     }));

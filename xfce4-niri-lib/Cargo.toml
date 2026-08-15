@@ -13,3 +13,4 @@ readme = "../README.md"
 keywords = ["niri", "xfce4", "embedded", "posix"]
 
 [dependencies]
+gtk = { version = "0.18", features = ["v3_24"] }
