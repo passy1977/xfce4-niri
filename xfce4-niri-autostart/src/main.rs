@@ -23,6 +23,7 @@ extern crate xfce4_niri_lib;
 
 mod data;
 mod gui;
+mod models;
 
 use std::error::Error;
 use std::ffi::c_int;

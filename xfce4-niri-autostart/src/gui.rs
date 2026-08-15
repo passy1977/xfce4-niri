@@ -20,6 +20,8 @@
 #![allow(dead_code)]
 #![allow(unused)]
 
+use std::path::Path;
+
 use gtk::gio::Icon;
 use gtk::{Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ScrolledWindow, SelectionMode, ShadowType, TreeViewColumn};
 use gtk::glib;
@@ -27,6 +29,15 @@ use gtk::glib::StaticType;
 use gtk::Box;
 use gtk::traits::{ButtonExt, CellRendererComboExt, StyleContextExt, BoxExt, CellRendererToggleExt, ContainerExt, TreeSelectionExt, TreeViewColumnExt, TreeViewExt, WidgetExt};
 use gtk::prelude::{GtkListStoreExtManual, GtkListStoreExt, TreeViewColumnExt as Column};
+use xfce4_niri_lib::fxce::xfce::{self, resource_match};
+
+use crate::models::item::Item;
+
+/// `xfce_rc_read_entry (rc, "Icon", "application-x-executable")`.
+pub(crate) const DEFAULT_ICON: &str = "application-x-executable";
+
+/// The desktop the C code filters `OnlyShowIn` / `NotShowIn` against.
+pub(crate) const DESKTOP: &str = "XFCE";
 
 mod col {
     pub const ICON: u32 = 0;
@@ -38,9 +49,23 @@ mod col {
     pub const RELPATH: u32 = 6;
 }
 
- pub(crate) struct Gui;
+/// `g_shell_parse_argv` + `g_find_program_in_path` on a `TryExec` value.
+pub(super) fn binary_exists(try_exec: &str) -> bool {
 
- impl Gui {
+    let Ok(argv) = glib::shell_parse_argv(try_exec) else {
+        return true // Unparsable: the C code leaves the entry alone.
+    };
+
+    let Some(program) = argv.first() else {
+        return true
+    };
+
+    Path::new(program).exists() || glib::find_program_in_path(program).is_some()
+}
+
+pub(crate) struct Gui;
+
+impl Gui {
     pub(crate) fn window_new() -> Box {
 
     let vbox = Box::builder()
@@ -164,36 +189,36 @@ mod col {
     fn model_new() -> ListStore {
 
         let model = ListStore::new(&[
-            Icon::static_type(), // ICON
-            String::static_type(),    // NAME (markup)
-            bool::static_type(),      // ENABLED
-            bool::static_type(),      // REMOVABLE
-            String::static_type(),    // TOOLTIP (markup)
-            String::static_type(),    // RUN_HOOK (nick)
-            String::static_type(),    // RELPATH
+            Icon::static_type(),        // ICON
+            String::static_type(),      // NAME (markup)
+            bool::static_type(),        // ENABLED
+            bool::static_type(),        // REMOVABLE
+            String::static_type(),      // TOOLTIP (markup)
+            String::static_type(),      // RUN_HOOK (nick)
+            String::static_type(),      // RELPATH
         ]);
 
-        // let mut items = xfce::resource_match("autostart/*.desktop", true)
-        //     .iter()
-        //     .filter_map(|relpath| Item::new(relpath))
-        //     .collect::<Vec<_>>();
+        let mut items = resource_match("autostart/*.desktop", true)
+            .iter()
+            .filter_map(|relpath| Item::new(relpath))
+            .collect::<Vec<_>>();
 
-        // items.sort_by(Item::sort_default);
+        items.sort_by(Item::sort_default);
 
-        // for item in &items {
-        //     model.set(&model.append(), &[
-        //         (col::ICON, &item.icon),
-        //         (col::NAME, &item.markup()),
-        //         (col::ENABLED, &item.is_enabled()),
-        //         (col::REMOVABLE, &item.is_removable()),
-        //         (col::TOOLTIP, &item.tooltip),
-        //         (col::RUN_HOOK, &item.run_hook.nick()),
-        //         (col::RELPATH, &item.relpath),
-        //     ]);
-        // }
+        for item in &items {
+            model.set(&model.append(), &[
+                (col::ICON, &item.icon),
+                (col::NAME, &item.markup()),
+                (col::ENABLED, &item.is_enabled()),
+                (col::REMOVABLE, &item.is_removable()),
+                (col::TOOLTIP, &item.tooltip),
+                (col::RUN_HOOK, &item.run_hook.nick()),
+                (col::RELPATH, &item.rel_path),
+            ]);
+        }
 
         model
     }
 
 
- }
+}

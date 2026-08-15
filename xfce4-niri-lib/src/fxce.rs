@@ -126,6 +126,8 @@ pub mod xfce {
     use super::ffi::xfce4util;
     use super::ffi::xfce4ui;
     
+    /// The only group of an autostart `.desktop` file.
+    pub const DESKTOP_ENTRY: &CStr = c"Desktop Entry";
 
     fn glib_bool(value: bool) -> gboolean {
         if value { GTRUE } else { GFALSE }

@@ -1,0 +1,136 @@
+/***************************************************************************
+ *
+ * xfce4-niri
+ * Copyright (C) 2026 Antonio Salsi <passy.linux@zresa.it>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, see <https://www.gnu.org/licenses/>.
+ *
+ ***************************************************************************/
+
+#![allow(unused)]
+
+use std::cmp::Ordering;
+use std::path::Path;
+
+use gtk::gio::{self, Icon, ThemedIcon};
+use gtk::glib::{self, Cast, IntoGStr};
+use xfce4_niri_lib::fxce::xfce::{self, DESKTOP_ENTRY};
+
+use crate::gui::{DEFAULT_ICON, DESKTOP, binary_exists};
+use crate::models::run_hook::RunHook;
+
+
+/// Port of `XfaeItem`: one `autostart/*.desktop` file, as read through
+/// `XfceRc` — so a user file overriding a system one reads as a single entry.
+pub(crate) struct Item {
+    pub (crate) name: String,
+    pub (crate) icon: Icon,
+    pub (crate) comment: String,
+    pub (crate) rel_path: String,
+    pub (crate) hidden: bool,
+    pub (crate) tooltip: String,
+    pub (crate) run_hook: RunHook,
+    pub (crate) show_in_xfce: bool,
+    pub (crate) show_in_override: bool,
+}
+
+impl Item {
+
+    /// Port of `xfae_item_new`: `None` for anything the C code skips, i.e. a
+    /// non `Application` entry, one hidden from this desktop by `NotShowIn`,
+    /// or one whose `TryExec` binary is missing.
+    pub(crate) fn new(rel_path: &str) -> Option<Self> {
+
+        let rc = xfce::Rc::config_open(rel_path, true)?;
+        rc.set_group(DESKTOP_ENTRY);
+
+        if !rc.read_entry(c"Type").is_some_and(|it| it.eq_ignore_ascii_case("Application")) {
+            return None
+        }
+
+        let icon = rc.read_entry(c"Icon").unwrap_or_else(|| DEFAULT_ICON.to_string());
+        let command = rc.read_entry(c"Exec").unwrap_or_default();
+
+        let mut item = Self {
+            name: rc.read_entry(c"Name").unwrap_or_default(),
+            icon: ThemedIcon::with_default_fallbacks(&icon).upcast(),
+            comment: rc.read_entry(c"Comment").unwrap_or_default(),
+            rel_path: rel_path.to_string(),
+            hidden: rc.read_bool_entry(c"Hidden", false),
+            tooltip: format!("<b>Command:</b> {}", glib::markup_escape_text(&command)),
+            run_hook: RunHook::from_value(rc.read_int_entry(c"RunHook", RunHook::Login.value())),
+            show_in_xfce: false,
+            show_in_override: rc.read_bool_entry(c"X-XFCE-Autostart-Override", false),
+        };
+
+        if rc.read_list_entry(c"NotShowIn").iter().any(|it| it.eq_ignore_ascii_case(DESKTOP)) {
+            return None
+        }
+
+        // No `OnlyShowIn` at all means "every desktop", so the entry is ours.
+        let only_show_in = rc.read_list_entry(c"OnlyShowIn");
+        item.show_in_xfce = only_show_in.is_empty()
+            || only_show_in.iter().any(|it| it.eq_ignore_ascii_case(DESKTOP));
+
+        if let Some(try_exec) = rc.read_entry(c"TryExec")
+            && !binary_exists(&try_exec) {
+            return None
+        }
+
+        Some(item)
+    }
+
+    /// Port of `xfae_item_is_enabled`: an entry not meant for this desktop
+    /// needs the `X-XFCE-Autostart-Override` opt in on top of not being hidden.
+    pub(crate) fn is_enabled(&self) -> bool {
+        if self.show_in_xfce {
+            !self.hidden
+        } else {
+            !self.hidden && self.show_in_override
+        }
+    }
+
+    /// Port of `xfae_item_is_removable`: removable only while every directory
+    /// holding a copy of the file can be written to.
+    pub(crate) fn is_removable(&self) -> bool {
+        xfce::resource_lookup_all(&self.rel_path)
+            .iter()
+            .all(|file| Path::new(file).parent().is_some_and(xfce::is_accessible_dir))
+    }
+
+    /// The markup `xfae_model_get_value` builds for `XFAE_MODEL_COLUMN_NAME`:
+    /// "name (comment)", in italics when the entry is not shown on this desktop.
+    pub(crate) fn markup(&self) -> String {
+
+        let name = glib::markup_escape_text(&self.name);
+
+        let name = if self.comment.is_empty() {
+            name.to_string()
+        } else {
+            format!("{name} ({})", glib::markup_escape_text(&self.comment))
+        };
+
+        if self.show_in_xfce { name } else { format!("<i>{name}</i>") }
+    }
+
+    /// Port of `xfae_item_sort_default`: entries for this desktop first, then
+    /// by name.
+    pub(crate) fn sort_default(a: &Self, b: &Self) -> Ordering {
+        match (a.show_in_xfce, b.show_in_xfce) {
+            (true, false) => Ordering::Less,
+            (false, true) => Ordering::Greater,
+            _ => a.name.as_str().run_with_gstr(|name| name.collate(b.name.as_str())),
+        }
+    }
+}
