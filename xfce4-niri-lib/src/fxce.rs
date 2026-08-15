@@ -119,7 +119,7 @@ pub mod xfce {
     use std::ptr;
 
     use gtk::glib;
-    use gtk::glib::ffi::{GFALSE, GTRUE, g_strfreev, gboolean};
+    use gtk::glib::ffi::{GError, GFALSE, GTRUE, g_strfreev, gboolean};
     use gtk::glib::translate::{Stash, ToGlibPtr};
     use gtk::prelude::*;
 
@@ -208,8 +208,7 @@ pub mod xfce {
         let parent = parent.map_or(ptr::null_mut(), |it| it.as_ptr());
 
         // The stash owns the borrowed `GError *` for the length of the call.
-        let error: Option<Stash<'_, *mut glib::ffi::GError, glib::Error>> =
-            error.map(ToGlibPtr::to_glib_none);
+        let error: Option<Stash<'_, *mut GError, glib::Error>> = error.map(ToGlibPtr::to_glib_none);
         let error = error.as_ref().map_or(ptr::null(), |it| it.0.cast_const());
 
         let message = CString::new(message).unwrap_or_default();
