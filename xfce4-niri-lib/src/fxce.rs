@@ -112,7 +112,7 @@ mod ffi {
 }
 
 /// Safe wrappers around xfce4util/xfce4ui
-mod xfce {
+pub mod xfce {
 
     use std::ffi::{CStr, CString, c_char};
     use std::path::Path;
@@ -123,9 +123,9 @@ mod xfce {
     use gtk::glib::translate::{Stash, ToGlibPtr};
     use gtk::prelude::*;
 
-    use crate::fxce::;
-
-use super::ffi;
+    use super::ffi::xfce4util;
+    use super::ffi::xfce4ui;
+    
 
     fn glib_bool(value: bool) -> gboolean {
         if value { GTRUE } else { GFALSE }
