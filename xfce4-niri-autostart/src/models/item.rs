@@ -18,14 +18,12 @@
  *
  ***************************************************************************/
 
-#![allow(unused)]
-
 use std::cmp::Ordering;
 use std::path::Path;
 
-use gtk::gio::{self, Icon, ThemedIcon};
-use gtk::glib::{self, Cast, IntoGStr};
-use xfce4_niri_lib::fxce::xfce::{self, DESKTOP_ENTRY};
+use gtk::gio::{Icon, ThemedIcon};
+use gtk::glib::{Cast, IntoGStr, markup_escape_text};
+use xfce4_niri_lib::fxce::{DESKTOP_ENTRY, Rc, resource_lookup_all};
 
 use crate::gui::{DEFAULT_ICON, DESKTOP, binary_exists};
 use crate::models::run_hook::RunHook;
@@ -52,7 +50,7 @@ impl Item {
     /// or one whose `TryExec` binary is missing.
     pub(crate) fn new(rel_path: &str) -> Option<Self> {
 
-        let rc = xfce::Rc::config_open(rel_path, true)?;
+        let rc = Rc::config_open(rel_path, true)?;
         rc.set_group(DESKTOP_ENTRY);
 
         if !rc.read_entry(c"Type").is_some_and(|it| it.eq_ignore_ascii_case("Application")) {
@@ -68,7 +66,7 @@ impl Item {
             comment: rc.read_entry(c"Comment").unwrap_or_default(),
             rel_path: rel_path.to_string(),
             hidden: rc.read_bool_entry(c"Hidden", false),
-            tooltip: format!("<b>Command:</b> {}", glib::markup_escape_text(&command)),
+            tooltip: format!("<b>Command:</b> {}", markup_escape_text(&command)),
             run_hook: RunHook::from_value(rc.read_int_entry(c"RunHook", RunHook::Login.value())),
             show_in_xfce: false,
             show_in_override: rc.read_bool_entry(c"X-XFCE-Autostart-Override", false),
@@ -104,21 +102,21 @@ impl Item {
     /// Port of `xfae_item_is_removable`: removable only while every directory
     /// holding a copy of the file can be written to.
     pub(crate) fn is_removable(&self) -> bool {
-        xfce::resource_lookup_all(&self.rel_path)
+        resource_lookup_all(&self.rel_path)
             .iter()
-            .all(|file| Path::new(file).parent().is_some_and(xfce::is_accessible_dir))
+            .all(|file| Path::new(file).parent().is_some_and(xfce4_niri_lib::fxce::is_accessible_dir))
     }
 
     /// The markup `xfae_model_get_value` builds for `XFAE_MODEL_COLUMN_NAME`:
     /// "name (comment)", in italics when the entry is not shown on this desktop.
     pub(crate) fn markup(&self) -> String {
 
-        let name = glib::markup_escape_text(&self.name);
+        let name = markup_escape_text(&self.name);
 
         let name = if self.comment.is_empty() {
             name.to_string()
         } else {
-            format!("{name} ({})", glib::markup_escape_text(&self.comment))
+            format!("{name} ({})", markup_escape_text(&self.comment))
         };
 
         if self.show_in_xfce { name } else { format!("<i>{name}</i>") }

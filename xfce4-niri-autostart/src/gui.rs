@@ -29,7 +29,7 @@ use gtk::glib::StaticType;
 use gtk::Box;
 use gtk::traits::{ButtonExt, CellRendererComboExt, StyleContextExt, BoxExt, CellRendererToggleExt, ContainerExt, TreeSelectionExt, TreeViewColumnExt, TreeViewExt, WidgetExt};
 use gtk::prelude::{GtkListStoreExtManual, GtkListStoreExt, TreeViewColumnExt as Column};
-use xfce4_niri_lib::fxce::xfce::{self, resource_match};
+use xfce4_niri_lib::fxce::{self, resource_match};
 
 use crate::models::item::Item;
 

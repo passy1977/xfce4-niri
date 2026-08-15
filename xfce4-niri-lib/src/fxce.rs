@@ -20,6 +20,29 @@
 
 #![allow(dead_code)]
 
+/// Safe wrappers around xfce4util/xfce4ui
+
+use std::ffi::{CStr, CString, c_char};
+use std::path::Path;
+use std::ptr;
+
+use gtk::glib;
+use gtk::glib::ffi::{GError, GFALSE, GTRUE, g_strfreev, gboolean};
+use gtk::glib::translate::{Stash, ToGlibPtr};
+use gtk::prelude::*;
+
+use crate::fxce::ffi::xfce4util;
+use crate::fxce::ffi::xfce4ui;
+
+
+/// The only group of an autostart `.desktop` file.
+pub const DESKTOP_ENTRY: &CStr = c"Desktop Entry";
+
+fn glib_bool(value: bool) -> gboolean {
+    if value { GTRUE } else { GFALSE }
+}
+
+
 mod ffi {
 
     pub(in crate::fxce) mod xfce4util {
@@ -111,173 +134,150 @@ mod ffi {
     }
 }
 
-/// Safe wrappers around xfce4util/xfce4ui
-pub mod xfce {
+/// Copies a `NULL` terminated `gchar **` owned by the caller into Rust
+/// strings, then hands it back to `g_strfreev`.
+///
+/// # Safety
+/// `strv` must be `NULL` or a `g_strfreev`-able string vector.
+unsafe fn from_strv(strv: *mut *mut c_char) -> Vec<String> {
 
-    use std::ffi::{CStr, CString, c_char};
-    use std::path::Path;
-    use std::ptr;
-
-    use gtk::glib;
-    use gtk::glib::ffi::{GError, GFALSE, GTRUE, g_strfreev, gboolean};
-    use gtk::glib::translate::{Stash, ToGlibPtr};
-    use gtk::prelude::*;
-
-    use super::ffi::xfce4util;
-    use super::ffi::xfce4ui;
-    
-    /// The only group of an autostart `.desktop` file.
-    pub const DESKTOP_ENTRY: &CStr = c"Desktop Entry";
-
-    fn glib_bool(value: bool) -> gboolean {
-        if value { GTRUE } else { GFALSE }
+    if strv.is_null() {
+        return Vec::new()
     }
 
-    /// Copies a `NULL` terminated `gchar **` owned by the caller into Rust
-    /// strings, then hands it back to `g_strfreev`.
+    let mut out = Vec::new();
+
+    unsafe {
+
+        let mut cursor = strv;
+        while !(*cursor).is_null() {
+            out.push(CStr::from_ptr(*cursor).to_string_lossy().into_owned());
+            cursor = cursor.add(1);
+        }
+
+        g_strfreev(strv);
+    }
+
+    out
+}
+
+/// `xfce_resource_match (XFCE_RESOURCE_CONFIG, pattern, unique)`: the
+/// relative paths of every config file matching `pattern`.
+pub fn resource_match(pattern: &str, unique: bool) -> Vec<String> {
+
+    let Ok(pattern) = CString::new(pattern) else {
+        return Vec::new()
+    };
+
+    unsafe {
+        from_strv(xfce4util::xfce_resource_match(
+            xfce4util::XFCE_RESOURCE_CONFIG,
+            pattern.as_ptr(),
+            glib_bool(unique),
+        ))
+    }
+}
+
+/// `xfce_resource_lookup_all (XFCE_RESOURCE_CONFIG, relpath)`: the absolute
+/// path of `relpath` in every config directory that holds a copy of it.
+pub fn resource_lookup_all(relpath: &str) -> Vec<String> {
+
+    let Ok(relpath) = CString::new(relpath) else {
+        return Vec::new()
+    };
+
+    unsafe {
+        from_strv(xfce4util::xfce_resource_lookup_all(
+            xfce4util::XFCE_RESOURCE_CONFIG,
+            relpath.as_ptr(),
+        ))
+    }
+}
+
+/// `access (path, R_OK | W_OK | X_OK)`, the test `xfae_item_is_removable`
+/// runs on the directory holding a `.desktop` file.
+pub fn is_accessible_dir(path: &Path) -> bool {
+
+    let Ok(path) = CString::new(path.as_os_str().as_encoded_bytes()) else {
+        return false
+    };
+
+    unsafe { xfce4ui::access(path.as_ptr(), xfce4ui::R_OK | xfce4ui::W_OK | xfce4ui::X_OK) == 0 }
+}
+
+/// `xfce_dialog_show_error (parent, error, "%s", message)`.
+pub fn show_error(parent: Option<&gtk::Window>, error: Option<&glib::Error>, message: &str) {
+
+    let parent = parent.map_or(ptr::null_mut(), |it| it.as_ptr());
+
+    // The stash owns the borrowed `GError *` for the length of the call.
+    let error: Option<Stash<'_, *mut GError, glib::Error>> = error.map(ToGlibPtr::to_glib_none);
+    let error = error.as_ref().map_or(ptr::null(), |it| it.0.cast_const());
+
+    let message = CString::new(message).unwrap_or_default();
+
+    unsafe { xfce4ui::xfce_dialog_show_error(parent, error, c"%s".as_ptr(), message.as_ptr()) };
+}
+
+/// An open `XfceRc`, closed on drop.
+pub struct Rc(*mut xfce4util::XfceRc);
+
+impl Rc {
+
+    /// `xfce_rc_config_open (XFCE_RESOURCE_CONFIG, relpath, readonly)`, the
+    /// system and user copies of `relpath` merged into one view.
     ///
-    /// # Safety
-    /// `strv` must be `NULL` or a `g_strfreev`-able string vector.
-    unsafe fn from_strv(strv: *mut *mut c_char) -> Vec<String> {
+    /// Always opened read only here: writing back is the one thing this
+    /// example does not do.
+    pub fn config_open(relpath: &str, readonly: bool) -> Option<Self> {
 
-        if strv.is_null() {
-            return Vec::new()
-        }
+        let relpath = CString::new(relpath).ok()?;
 
-        let mut out = Vec::new();
-
-        unsafe {
-
-            let mut cursor = strv;
-            while !(*cursor).is_null() {
-                out.push(CStr::from_ptr(*cursor).to_string_lossy().into_owned());
-                cursor = cursor.add(1);
-            }
-
-            g_strfreev(strv);
-        }
-
-        out
-    }
-
-    /// `xfce_resource_match (XFCE_RESOURCE_CONFIG, pattern, unique)`: the
-    /// relative paths of every config file matching `pattern`.
-    pub fn resource_match(pattern: &str, unique: bool) -> Vec<String> {
-
-        let Ok(pattern) = CString::new(pattern) else {
-            return Vec::new()
-        };
-
-        unsafe {
-            from_strv(xfce4util::xfce_resource_match(
-                xfce4util::XFCE_RESOURCE_CONFIG,
-                pattern.as_ptr(),
-                glib_bool(unique),
-            ))
-        }
-    }
-
-    /// `xfce_resource_lookup_all (XFCE_RESOURCE_CONFIG, relpath)`: the absolute
-    /// path of `relpath` in every config directory that holds a copy of it.
-    pub fn resource_lookup_all(relpath: &str) -> Vec<String> {
-
-        let Ok(relpath) = CString::new(relpath) else {
-            return Vec::new()
-        };
-
-        unsafe {
-            from_strv(xfce4util::xfce_resource_lookup_all(
+        let rc = unsafe {
+            xfce4util::xfce_rc_config_open(
                 xfce4util::XFCE_RESOURCE_CONFIG,
                 relpath.as_ptr(),
-            ))
-        }
-    }
-
-    /// `access (path, R_OK | W_OK | X_OK)`, the test `xfae_item_is_removable`
-    /// runs on the directory holding a `.desktop` file.
-    pub fn is_accessible_dir(path: &Path) -> bool {
-
-        let Ok(path) = CString::new(path.as_os_str().as_encoded_bytes()) else {
-            return false
+                glib_bool(readonly),
+            )
         };
 
-        unsafe { xfce4ui::access(path.as_ptr(), xfce4ui::R_OK | xfce4ui::W_OK | xfce4ui::X_OK) == 0 }
+        (!rc.is_null()).then_some(Self(rc))
     }
 
-    /// `xfce_dialog_show_error (parent, error, "%s", message)`.
-    pub fn show_error(parent: Option<&gtk::Window>, error: Option<&glib::Error>, message: &str) {
-
-        let parent = parent.map_or(ptr::null_mut(), |it| it.as_ptr());
-
-        // The stash owns the borrowed `GError *` for the length of the call.
-        let error: Option<Stash<'_, *mut GError, glib::Error>> = error.map(ToGlibPtr::to_glib_none);
-        let error = error.as_ref().map_or(ptr::null(), |it| it.0.cast_const());
-
-        let message = CString::new(message).unwrap_or_default();
-
-        unsafe { xfce4ui::xfce_dialog_show_error(parent, error, c"%s".as_ptr(), message.as_ptr()) };
+    /// `xfce_rc_set_group (rc, group)`.
+    pub fn set_group(&self, group: &CStr) {
+        unsafe { xfce4util::xfce_rc_set_group(self.0, group.as_ptr()) };
     }
 
-    /// An open `XfceRc`, closed on drop.
-    pub struct Rc(*mut xfce4util::XfceRc);
+    /// `xfce_rc_read_entry (rc, key, NULL)`, copied out of the library.
+    pub fn read_entry(&self, key: &CStr) -> Option<String> {
 
-    impl Rc {
+        let value = unsafe { xfce4util::xfce_rc_read_entry(self.0, key.as_ptr(), ptr::null()) };
 
-        /// `xfce_rc_config_open (XFCE_RESOURCE_CONFIG, relpath, readonly)`, the
-        /// system and user copies of `relpath` merged into one view.
-        ///
-        /// Always opened read only here: writing back is the one thing this
-        /// example does not do.
-        pub fn config_open(relpath: &str, readonly: bool) -> Option<Self> {
-
-            let relpath = CString::new(relpath).ok()?;
-
-            let rc = unsafe {
-                xfce4util::xfce_rc_config_open(
-                    xfce4util::XFCE_RESOURCE_CONFIG,
-                    relpath.as_ptr(),
-                    glib_bool(readonly),
-                )
-            };
-
-            (!rc.is_null()).then_some(Self(rc))
-        }
-
-        /// `xfce_rc_set_group (rc, group)`.
-        pub fn set_group(&self, group: &CStr) {
-            unsafe { xfce4util::xfce_rc_set_group(self.0, group.as_ptr()) };
-        }
-
-        /// `xfce_rc_read_entry (rc, key, NULL)`, copied out of the library.
-        pub fn read_entry(&self, key: &CStr) -> Option<String> {
-
-            let value = unsafe { xfce4util::xfce_rc_read_entry(self.0, key.as_ptr(), ptr::null()) };
-
-            (!value.is_null())
-                .then(|| unsafe { CStr::from_ptr(value) }.to_string_lossy().into_owned())
-        }
-
-        /// `xfce_rc_read_int_entry (rc, key, fallback)`.
-        pub fn read_int_entry(&self, key: &CStr, fallback: i32) -> i32 {
-            unsafe { xfce4util::xfce_rc_read_int_entry(self.0, key.as_ptr(), fallback) }
-        }
-
-        /// `xfce_rc_read_bool_entry (rc, key, fallback)`.
-        pub fn read_bool_entry(&self, key: &CStr, fallback: bool) -> bool {
-            unsafe { xfce4util::xfce_rc_read_bool_entry(self.0, key.as_ptr(), glib_bool(fallback)) != GFALSE }
-        }
-
-        /// `xfce_rc_read_list_entry (rc, key, ";")`, empty when the key is unset.
-        pub fn read_list_entry(&self, key: &CStr) -> Vec<String> {
-            unsafe { from_strv(xfce4util::xfce_rc_read_list_entry(self.0, key.as_ptr(), c";".as_ptr())) }
-        }
+        (!value.is_null())
+            .then(|| unsafe { CStr::from_ptr(value) }.to_string_lossy().into_owned())
     }
 
-    impl Drop for Rc {
+    /// `xfce_rc_read_int_entry (rc, key, fallback)`.
+    pub fn read_int_entry(&self, key: &CStr, fallback: i32) -> i32 {
+        unsafe { xfce4util::xfce_rc_read_int_entry(self.0, key.as_ptr(), fallback) }
+    }
 
-        /// `xfce_rc_close (rc)`.
-        fn drop(&mut self) {
-            unsafe { xfce4util::xfce_rc_close(self.0) };
-        }
+    /// `xfce_rc_read_bool_entry (rc, key, fallback)`.
+    pub fn read_bool_entry(&self, key: &CStr, fallback: bool) -> bool {
+        unsafe { xfce4util::xfce_rc_read_bool_entry(self.0, key.as_ptr(), glib_bool(fallback)) != GFALSE }
+    }
+
+    /// `xfce_rc_read_list_entry (rc, key, ";")`, empty when the key is unset.
+    pub fn read_list_entry(&self, key: &CStr) -> Vec<String> {
+        unsafe { from_strv(xfce4util::xfce_rc_read_list_entry(self.0, key.as_ptr(), c";".as_ptr())) }
+    }
+}
+
+impl Drop for Rc {
+
+    /// `xfce_rc_close (rc)`.
+    fn drop(&mut self) {
+        unsafe { xfce4util::xfce_rc_close(self.0) };
     }
 }
