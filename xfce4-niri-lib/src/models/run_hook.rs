@@ -37,13 +37,13 @@ pub enum RunHook {
     Suspend,
     Hibernate,
     HybridSleep,
-    SwitchUser,
+    // SwitchUser,
 }
 
 impl RunHook {
 
     /// In `GEnumValue` order, the order the combo boxes list them in.
-    const ALL: [Self; 8] = [
+    const ALL: [Self; 7] = [
         Self::Login,
         Self::Logout,
         Self::Shutdown,
@@ -51,7 +51,7 @@ impl RunHook {
         Self::Suspend,
         Self::Hibernate,
         Self::HybridSleep,
-        Self::SwitchUser,
+        // Self::SwitchUser,
     ];
 
     /// `g_enum_get_value (klass, value)`, falling back to the C default of
@@ -79,7 +79,7 @@ impl RunHook {
             Self::Suspend => "on suspend",
             Self::Hibernate => "on hibernate",
             Self::HybridSleep => "on hybrid sleep",
-            Self::SwitchUser => "on switch user",
+            // Self::SwitchUser => "on switch user",
         }
     }
 }
@@ -100,7 +100,7 @@ mod tests {
         assert_eq!(RunHook::Suspend.value(), 4);
         assert_eq!(RunHook::Hibernate.value(), 5);
         assert_eq!(RunHook::HybridSleep.value(), 6);
-        assert_eq!(RunHook::SwitchUser.value(), 7);
+        // assert_eq!(RunHook::SwitchUser.value(), 7);
     }
 
     /// What is written to the `RunHook` key has to read back as itself.
