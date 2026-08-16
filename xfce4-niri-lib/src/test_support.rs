@@ -39,7 +39,7 @@ use std::{env, process};
 pub fn xfce_resource_ready() {
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
-        crate::fxce::resource_save_location("xfce4-niri-resource-warm-up", false);
+        crate::xfce::resource_save_location("xfce4-niri-resource-warm-up", false);
     });
 }
 

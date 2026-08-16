@@ -30,7 +30,7 @@ use gtk::traits::{BoxExt, ButtonExt, CellRendererComboExt, CellRendererToggleExt
 use gtk::prelude::{GtkListStoreExtManual, GtkListStoreExt, TreeViewColumnExt as Column};
 
 use osal_rs::os::{Mutex, MutexFn};
-use xfce4_niri_lib::fxce::resource_match;
+use xfce4_niri_lib::xfce::{self, resource_match};
 use xfce4_niri_lib::models::item::Item;
 use xfce4_niri_lib::models::run_hook::RunHook;
 
@@ -157,18 +157,15 @@ impl Gui {
         };
 
         let add = button("Add", "list-add-symbolic", "Add application");
-        //TODO: to handle
-        // add.connect_clicked(glib::clone!(@weak tree_view => move |_| xfae_window_add(&tree_view)));
+        add.connect_clicked(glib::clone!(@weak tree_view => move |_| Self::on_add_clicked(&tree_view)));
         bbox.pack_start(&add, false, false, 0);
 
         let remove = button("Remove", "list-remove-symbolic", "Remove application");
-        //TODO: to handle
-        // remove.connect_clicked(glib::clone!(@weak tree_view => move |_| xfae_window_remove(&tree_view)));
+        remove.connect_clicked(glib::clone!(@weak tree_view => move |_| Self::on_remove_clicked(&tree_view)));
         bbox.pack_start(&remove, false, false, 0);
 
         let edit = button("Edit", "document-edit-symbolic", "Edit application");
-        //TODO: to handle
-        // edit.connect_clicked(glib::clone!(@weak tree_view => move |_| xfae_window_edit(&tree_view)));
+        edit.connect_clicked(glib::clone!(@weak tree_view => move |_| Self::on_edit_clicked(&tree_view)));
         bbox.pack_start(&edit, false, false, 0);
 
         selection.connect_changed(glib::clone!(@weak remove, @weak edit => move |_selection| {
@@ -360,5 +357,87 @@ impl Gui {
         let nick = Self::cell_string(&combo_model, combo_iter, 0);
         model.set_value(&iter, col::RUN_HOOK, &nick.to_value());
     }
+
+    fn on_add_clicked(tree_view: &gtk::TreeView) {
+
+        let parent = Self::toplevel(tree_view);
+        let dialog = Dialog::new(parent.as_ref(), None, None, None, RunHook::Login);
+
+        if dialog.run() == gtk::ResponseType::Ok {
+            dialog.hide();
+            let (_name, _descr, _command, _run_hook) = dialog.get();
+        }
+
+        dialog.destroy();
+    }
+
+    fn on_remove_clicked(tree_view: &gtk::TreeView) {
+
+        let Some((model, iter)) = tree_view.selection().selected() else {
+            return
+        };
+
+        let Ok(model) = model.downcast::<gtk::ListStore>() else {
+            return
+        };
+
+        model.remove(&iter);
+    }
+
+    /// Port of `xfae_model_get`: reads back the entry behind a row, which is what
+    /// the edit dialog is filled with.
+    fn model_get(relpath: &str) -> Result<(String, String, String, RunHook), glib::Error> {
+
+        let Some(rc) = xfce::Rc::config_open(relpath, true) else {
+            return Err(glib::Error::new(
+                glib::FileError::Io,
+                &format!("Failed to open {relpath} for reading"),
+            ))
+        };
+
+        rc.set_group(xfce::DESKTOP_ENTRY);
+
+        Ok((
+            rc.read_entry(c"Name").unwrap_or_default(),
+            rc.read_entry(c"Comment").unwrap_or_default(),
+            rc.read_entry(c"Exec").unwrap_or_default(),
+            RunHook::from_value(rc.read_int_entry(c"RunHook", RunHook::Login.value())),
+        ))
+    }
+
+    fn on_edit_clicked(tree_view: &gtk::TreeView) {
+
+        let parent = Self::toplevel(tree_view);
+
+        let Some((model, iter)) = tree_view.selection().selected() else {
+            return
+        };
+
+        let rel_path = Self::cell_string(&model, &iter, col::RELPATH);
+
+        let (name, descr, command, run_hook) = match Self::model_get(&rel_path) {
+            Ok(entry) => entry,
+            Err(error) => {
+                xfce::show_error(parent.as_ref(), Some(&error), "Failed to edit item");
+                return
+            }
+        };
+
+        let dialog = Dialog::new(
+            parent.as_ref(),
+            Some(&name),
+            Some(&descr),
+            Some(&command),
+            run_hook,
+        );
+
+        if dialog.run() == gtk::ResponseType::Ok {
+            dialog.hide();
+            let (_name, _descr, _command, _run_hook) = dialog.get();
+        }
+
+        dialog.destroy();
+    }
+
 
 }

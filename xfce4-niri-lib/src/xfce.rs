@@ -32,8 +32,8 @@ use gtk::glib::ffi::{GError, GFALSE, GTRUE, g_free, g_strfreev, gboolean};
 use gtk::glib::translate::{Stash, ToGlibPtr};
 use gtk::prelude::*;
 
-use crate::fxce::ffi::xfce4util;
-use crate::fxce::ffi::xfce4ui;
+use crate::xfce::ffi::xfce4util;
+use crate::xfce::ffi::xfce4ui;
 
 
 /// The only group of an autostart `.desktop` file.
@@ -46,7 +46,7 @@ fn glib_bool(value: bool) -> gboolean {
 
 mod ffi {
 
-    pub(in crate::fxce) mod xfce4util {
+    pub(in crate::xfce) mod xfce4util {
         use std::ffi::{c_char, c_int};
         use gtk::glib::ffi::gboolean;
 
@@ -63,84 +63,84 @@ mod ffi {
         #[link(name = "xfce4util")]
         unsafe extern "C" {
 
-            pub(in crate::fxce) fn xfce_resource_match(
+            pub(in crate::xfce) fn xfce_resource_match(
                 type_: c_int,
                 pattern: *const c_char,
                 unique: gboolean,
             ) -> *mut *mut c_char;
 
-            pub(in crate::fxce) fn xfce_resource_lookup_all(type_: c_int, filename: *const c_char) -> *mut *mut c_char;
+            pub(in crate::xfce) fn xfce_resource_lookup_all(type_: c_int, filename: *const c_char) -> *mut *mut c_char;
 
             /// The `gchar *` is the caller's, hence `g_free`.
-            pub(in crate::fxce) fn xfce_resource_save_location(
+            pub(in crate::xfce) fn xfce_resource_save_location(
                 type_: c_int,
                 rel_path: *const c_char,
                 create: gboolean,
             ) -> *mut c_char;
 
-            pub(in crate::fxce) fn xfce_rc_config_open(
+            pub(in crate::xfce) fn xfce_rc_config_open(
                 type_: c_int,
                 resource: *const c_char,
                 readonly: gboolean,
             ) -> *mut XfceRc;
 
-            pub(in crate::fxce) fn xfce_rc_simple_open(filename: *const c_char, readonly: gboolean) -> *mut XfceRc;
+            pub(in crate::xfce) fn xfce_rc_simple_open(filename: *const c_char, readonly: gboolean) -> *mut XfceRc;
 
-            pub(in crate::fxce) fn xfce_rc_close(rc: *mut XfceRc);
+            pub(in crate::xfce) fn xfce_rc_close(rc: *mut XfceRc);
 
-            pub(in crate::fxce) fn xfce_rc_flush(rc: *mut XfceRc);
+            pub(in crate::xfce) fn xfce_rc_flush(rc: *mut XfceRc);
 
-            pub(in crate::fxce) fn xfce_rc_rollback(rc: *mut XfceRc);
+            pub(in crate::xfce) fn xfce_rc_rollback(rc: *mut XfceRc);
 
-            pub(in crate::fxce) fn xfce_rc_is_dirty(rc: *const XfceRc) -> gboolean;
+            pub(in crate::xfce) fn xfce_rc_is_dirty(rc: *const XfceRc) -> gboolean;
 
-            pub(in crate::fxce) fn xfce_rc_is_readonly(rc: *const XfceRc) -> gboolean;
+            pub(in crate::xfce) fn xfce_rc_is_readonly(rc: *const XfceRc) -> gboolean;
 
-            pub(in crate::fxce) fn xfce_rc_set_group(rc: *mut XfceRc, group: *const c_char);
+            pub(in crate::xfce) fn xfce_rc_set_group(rc: *mut XfceRc, group: *const c_char);
 
-            pub(in crate::fxce) fn xfce_rc_read_entry(
+            pub(in crate::xfce) fn xfce_rc_read_entry(
                 rc: *const XfceRc,
                 key: *const c_char,
                 fallback: *const c_char,
             ) -> *const c_char;
 
-            pub(in crate::fxce) fn xfce_rc_read_int_entry(rc: *const XfceRc, key: *const c_char, fallback: c_int) -> c_int;
+            pub(in crate::xfce) fn xfce_rc_read_int_entry(rc: *const XfceRc, key: *const c_char, fallback: c_int) -> c_int;
 
-            pub(in crate::fxce) fn xfce_rc_read_bool_entry(
+            pub(in crate::xfce) fn xfce_rc_read_bool_entry(
                 rc: *const XfceRc,
                 key: *const c_char,
                 fallback: gboolean,
             ) -> gboolean;
 
-            pub(in crate::fxce) fn xfce_rc_read_list_entry(
+            pub(in crate::xfce) fn xfce_rc_read_list_entry(
                 rc: *const XfceRc,
                 key: *const c_char,
                 delimiter: *const c_char,
             ) -> *mut *mut c_char;
 
-            pub(in crate::fxce) fn xfce_rc_write_entry(rc: *mut XfceRc, key: *const c_char, value: *const c_char);
+            pub(in crate::xfce) fn xfce_rc_write_entry(rc: *mut XfceRc, key: *const c_char, value: *const c_char);
 
-            pub(in crate::fxce) fn xfce_rc_write_int_entry(rc: *mut XfceRc, key: *const c_char, value: c_int);
+            pub(in crate::xfce) fn xfce_rc_write_int_entry(rc: *mut XfceRc, key: *const c_char, value: c_int);
 
-            pub(in crate::fxce) fn xfce_rc_write_bool_entry(rc: *mut XfceRc, key: *const c_char, value: gboolean);
+            pub(in crate::xfce) fn xfce_rc_write_bool_entry(rc: *mut XfceRc, key: *const c_char, value: gboolean);
 
             /// `value` is a `NULL` terminated `gchar **`, only read.
-            pub(in crate::fxce) fn xfce_rc_write_list_entry(
+            pub(in crate::xfce) fn xfce_rc_write_list_entry(
                 rc: *mut XfceRc,
                 key: *const c_char,
                 value: *mut *mut c_char,
                 separator: *const c_char,
             );
 
-            pub(in crate::fxce) fn xfce_rc_delete_entry(rc: *mut XfceRc, key: *const c_char, global: gboolean);
+            pub(in crate::xfce) fn xfce_rc_delete_entry(rc: *mut XfceRc, key: *const c_char, global: gboolean);
 
-            pub(in crate::fxce) fn xfce_rc_delete_group(rc: *mut XfceRc, group: *const c_char, global: gboolean);
+            pub(in crate::xfce) fn xfce_rc_delete_group(rc: *mut XfceRc, group: *const c_char, global: gboolean);
         }
 
     }
 
 
-    pub(in crate::fxce) mod xfce4ui {
+    pub(in crate::xfce) mod xfce4ui {
         use std::ffi::{c_char, c_int};
         use gtk::ffi::GtkWindow;
         use gtk::glib::ffi::GError;
@@ -151,7 +151,7 @@ mod ffi {
 
             /// Variadic `printf` style, hence the `...`: the wrapper always passes
             /// `"%s"` plus one argument so a message can never be read as a format.
-            pub(in crate::fxce) fn xfce_dialog_show_error(
+            pub(in crate::xfce) fn xfce_dialog_show_error(
                 parent: *mut GtkWindow,
                 error: *const GError,
                 primary_format: *const c_char,
@@ -164,7 +164,7 @@ mod ffi {
         pub const X_OK: c_int = 0x01;
 
         unsafe extern "C" {
-            pub(in crate::fxce) fn access(path: *const c_char, mode: c_int) -> c_int;
+            pub(in crate::xfce) fn access(path: *const c_char, mode: c_int) -> c_int;
         }
 
     }

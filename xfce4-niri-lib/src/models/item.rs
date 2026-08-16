@@ -23,7 +23,7 @@ use std::path::Path;
 
 use gtk::gio::{Icon, ThemedIcon};
 use gtk::glib::{Cast, IntoGStr, markup_escape_text};
-use crate::fxce::{DESKTOP_ENTRY, Rc, is_accessible_dir, resource_lookup_all};
+use crate::xfce::{DESKTOP_ENTRY, Rc, is_accessible_dir, resource_lookup_all};
 
 use crate::binary_exists;
 // use crate::gui::{DEFAULT_ICON, DESKTOP, binary_exists, is_accessible_dir};
