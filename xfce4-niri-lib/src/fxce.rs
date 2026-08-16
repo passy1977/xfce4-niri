@@ -74,7 +74,7 @@ mod ffi {
             /// The `gchar *` is the caller's, hence `g_free`.
             pub(in crate::fxce) fn xfce_resource_save_location(
                 type_: c_int,
-                relpath: *const c_char,
+                rel_path: *const c_char,
                 create: gboolean,
             ) -> *mut c_char;
 
@@ -214,33 +214,33 @@ pub fn resource_match(pattern: &str, unique: bool) -> Vec<String> {
     }
 }
 
-/// `xfce_resource_lookup_all (XFCE_RESOURCE_CONFIG, relpath)`: the absolute
-/// path of `relpath` in every config directory that holds a copy of it.
-pub fn resource_lookup_all(relpath: &str) -> Vec<String> {
+/// `xfce_resource_lookup_all (XFCE_RESOURCE_CONFIG, rel_path)`: the absolute
+/// path of `rel_path` in every config directory that holds a copy of it.
+pub fn resource_lookup_all(rel_path: &str) -> Vec<String> {
 
-    let Ok(relpath) = CString::new(relpath) else {
+    let Ok(rel_path) = CString::new(rel_path) else {
         return Vec::new()
     };
 
     unsafe {
         from_strv(xfce4util::xfce_resource_lookup_all(
             xfce4util::XFCE_RESOURCE_CONFIG,
-            relpath.as_ptr(),
+            rel_path.as_ptr(),
         ))
     }
 }
 
-/// `xfce_resource_save_location (XFCE_RESOURCE_CONFIG, relpath, create)`: the
+/// `xfce_resource_save_location (XFCE_RESOURCE_CONFIG, rel_path, create)`: the
 /// path under `$XDG_CONFIG_HOME` a new file goes to, its directories made
 /// when `create`.
-pub fn resource_save_location(relpath: &str, create: bool) -> Option<PathBuf> {
+pub fn resource_save_location(rel_path: &str, create: bool) -> Option<PathBuf> {
 
-    let relpath = CString::new(relpath).ok()?;
+    let rel_path = CString::new(rel_path).ok()?;
 
     let path = unsafe {
         xfce4util::xfce_resource_save_location(
             xfce4util::XFCE_RESOURCE_CONFIG,
-            relpath.as_ptr(),
+            rel_path.as_ptr(),
             glib_bool(create),
         )
     };
@@ -286,19 +286,19 @@ pub struct Rc(*mut xfce4util::XfceRc);
 
 impl Rc {
 
-    /// `xfce_rc_config_open (XFCE_RESOURCE_CONFIG, relpath, readonly)`, the
-    /// system and user copies of `relpath` merged into one view.
+    /// `xfce_rc_config_open (XFCE_RESOURCE_CONFIG, rel_path, readonly)`, the
+    /// system and user copies of `rel_path` merged into one view.
     ///
     /// Opened for writing, the changes land in the user copy: a system entry
     /// is shadowed rather than edited.
-    pub fn config_open(relpath: &str, readonly: bool) -> Option<Self> {
+    pub fn config_open(rel_path: &str, readonly: bool) -> Option<Self> {
 
-        let relpath = CString::new(relpath).ok()?;
+        let rel_path = CString::new(rel_path).ok()?;
 
         let rc = unsafe {
             xfce4util::xfce_rc_config_open(
                 xfce4util::XFCE_RESOURCE_CONFIG,
-                relpath.as_ptr(),
+                rel_path.as_ptr(),
                 glib_bool(readonly),
             )
         };
@@ -717,12 +717,12 @@ mod tests {
 
         xfce_resource_ready();
 
-        let relpath = "autostart/xfce4-niri-save-location.desktop";
+        let rel_path = "autostart/xfce4-niri-save-location.desktop";
 
-        let path = resource_save_location(relpath, false).expect("a path to write to");
+        let path = resource_save_location(rel_path, false).expect("a path to write to");
 
         assert!(path.is_absolute(), "{}", path.display());
-        assert!(path.ends_with(relpath), "{}", path.display());
+        assert!(path.ends_with(rel_path), "{}", path.display());
 
         assert_eq!(resource_save_location("autostart/nul\0byte.desktop", false), None);
     }
