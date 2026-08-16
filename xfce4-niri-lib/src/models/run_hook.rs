@@ -83,3 +83,64 @@ impl RunHook {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn value_is_the_position_in_the_enum() {
+
+        assert_eq!(RunHook::Login.value(), 0);
+        assert_eq!(RunHook::Logout.value(), 1);
+        assert_eq!(RunHook::Shutdown.value(), 2);
+        assert_eq!(RunHook::Restart.value(), 3);
+        assert_eq!(RunHook::Suspend.value(), 4);
+        assert_eq!(RunHook::Hibernate.value(), 5);
+        assert_eq!(RunHook::HybridSleep.value(), 6);
+        assert_eq!(RunHook::SwitchUser.value(), 7);
+    }
+
+    /// What is written to the `RunHook` key has to read back as itself.
+    #[test]
+    fn from_value_and_value_round_trip() {
+
+        for (index, hook) in RunHook::ALL.iter().enumerate() {
+            assert_eq!(hook.value(), index as i32);
+            assert!(RunHook::from_value(hook.value()) == *hook);
+        }
+    }
+
+    /// A value no longer in the enum reads as the C default, `XFSM_RUN_HOOK_LOGIN`.
+    #[test]
+    fn from_value_falls_back_to_login() {
+
+        for value in [-1, 8, 42, i32::MIN, i32::MAX] {
+            assert!(RunHook::from_value(value) == RunHook::Login, "{value} should fall back");
+        }
+    }
+
+    #[test]
+    fn default_is_login() {
+        assert!(RunHook::default() == RunHook::Login);
+    }
+
+    #[test]
+    fn every_hook_has_its_own_nick() {
+
+        let nicks: Vec<&str> = RunHook::ALL.iter().map(|it| it.nick()).collect();
+
+        assert_eq!(nicks, [
+            "on login",
+            "on logout",
+            "on shutdown",
+            "on restart",
+            "on suspend",
+            "on hibernate",
+            "on hybrid sleep",
+            "on switch user",
+        ]);
+    }
+}

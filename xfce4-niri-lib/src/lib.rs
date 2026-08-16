@@ -18,10 +18,13 @@
  *
  ***************************************************************************/
 
-pub mod fxce; 
+pub mod fxce;
 pub mod models;
 pub mod niri_check;
 pub mod syslog;
+
+#[cfg(test)]
+mod test_support;
 
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
@@ -67,5 +70,134 @@ pub fn binary_exists(binary: &str) -> bool {
         .split(|it| *it == b':')
         .map(|dir| if dir.is_empty() { Path::new(".") } else { Path::new(OsStr::from_bytes(dir)) })
         .any(|dir| is_program(dir.join(program)))
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::test_support::{EnvGuard, TempDir};
+
+    const EXECUTABLE: u32 = 0o755;
+    const READABLE: u32 = 0o644;
+
+    #[test]
+    fn is_program_wants_an_executable_file() {
+
+        let dir = TempDir::new();
+
+        assert!(is_program(dir.file("runnable", EXECUTABLE)));
+        assert!(!is_program(dir.file("plain", READABLE)));
+        assert!(!is_program(dir.path()), "a directory is not a program");
+        assert!(!is_program(dir.path().join("missing")));
+    }
+
+    /// Any of the three `x` bits is enough, the same test the C code runs.
+    #[test]
+    fn is_program_accepts_any_execute_bit() {
+
+        let dir = TempDir::new();
+
+        assert!(is_program(dir.file("owner", 0o100)));
+        assert!(is_program(dir.file("group", 0o010)));
+        assert!(is_program(dir.file("other", 0o001)));
+    }
+
+    #[test]
+    fn binary_exists_follows_a_path_without_looking_at_path_var() {
+
+        let dir = TempDir::new();
+        let runnable = dir.file("runnable", EXECUTABLE);
+        let plain = dir.file("plain", READABLE);
+
+        let mut env = EnvGuard::new();
+        env.set("PATH", dir.path());
+
+        assert!(binary_exists(runnable.to_str().unwrap()));
+        assert!(!binary_exists(plain.to_str().unwrap()));
+        assert!(!binary_exists(dir.path().join("missing").to_str().unwrap()));
+
+        // A relative name holding a `/` is a path too, so `PATH` is not searched.
+        assert!(!binary_exists("./runnable"));
+    }
+
+    #[test]
+    fn binary_exists_searches_every_path_element() {
+
+        let dir = TempDir::new();
+        let first = dir.dir("first");
+        let second = dir.dir("second");
+
+        dir.file("second/runnable", EXECUTABLE);
+
+        let mut env = EnvGuard::new();
+
+        env.set("PATH", format!("{}:{}", first.display(), second.display()));
+        assert!(binary_exists("runnable"));
+
+        env.set("PATH", first.display().to_string());
+        assert!(!binary_exists("runnable"));
+    }
+
+    /// Only the first word is the program: the arguments are not looked up.
+    #[test]
+    fn binary_exists_looks_at_the_parsed_program_only() {
+
+        let dir = TempDir::new();
+        dir.file("runnable", EXECUTABLE);
+        dir.file("with space", EXECUTABLE);
+
+        let mut env = EnvGuard::new();
+        env.set("PATH", dir.path());
+
+        assert!(binary_exists("runnable --flag /missing/argument"));
+        assert!(binary_exists("\"with space\" --flag"));
+        assert!(!binary_exists("missing runnable"));
+    }
+
+    /// An unparsable or empty command line is left alone, like the C code does.
+    #[test]
+    fn binary_exists_keeps_what_it_cannot_parse() {
+
+        let dir = TempDir::new();
+
+        let mut env = EnvGuard::new();
+        env.set("PATH", dir.path());
+
+        assert!(binary_exists("\"unterminated"), "unbalanced quote");
+        assert!(binary_exists("'"), "unbalanced quote");
+        assert!(binary_exists(""), "no words at all");
+        assert!(binary_exists("   "), "no words at all");
+    }
+
+    /// An empty `PATH` element means the working directory.
+    #[test]
+    fn binary_exists_reads_an_empty_path_element_as_the_working_dir() {
+
+        let dir = TempDir::new();
+        dir.file("runnable", EXECUTABLE);
+
+        let mut env = EnvGuard::new();
+        env.set("PATH", ":/nowhere").chdir(dir.path());
+
+        assert!(binary_exists("runnable"));
+    }
+
+    /// An unset or empty `PATH` falls back to `/bin:/usr/bin:.`, which is where
+    /// the shell lives on any POSIX system.
+    #[test]
+    fn binary_exists_falls_back_to_a_default_path() {
+
+        let mut env = EnvGuard::new();
+
+        env.unset("PATH");
+        assert!(binary_exists("sh"));
+
+        env.set("PATH", "");
+        assert!(binary_exists("sh"));
+
+        assert!(!binary_exists("xfce4-niri-no-such-binary"));
+    }
 }
 

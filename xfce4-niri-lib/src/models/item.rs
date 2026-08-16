@@ -133,3 +133,122 @@ impl Item {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    /// An item built by hand: [`Item::new`] needs a real `.desktop` file under
+    /// the XFCE config directories, everything below is pure logic on the fields.
+    fn item(name: &str, show_in_xfce: bool) -> Item {
+        Item {
+            name: name.to_string(),
+            icon: ThemedIcon::with_default_fallbacks("application-x-executable").upcast(),
+            comment: String::new(),
+            rel_path: format!("autostart/{name}.desktop"),
+            hidden: false,
+            tooltip: String::new(),
+            run_hook: RunHook::default(),
+            show_in_xfce,
+            show_in_override: false,
+        }
+    }
+
+    /// An entry meant for this desktop is enabled unless `Hidden`; one meant for
+    /// another desktop needs `X-XFCE-Autostart-Override` on top of that.
+    #[test]
+    fn is_enabled_needs_the_override_outside_this_desktop() {
+
+        for (show_in_xfce, hidden, show_in_override, expected) in [
+            (true, false, false, true),
+            (true, false, true, true),
+            (true, true, false, false),
+            (true, true, true, false),
+            (false, false, false, false),
+            (false, false, true, true),
+            (false, true, false, false),
+            (false, true, true, false),
+        ] {
+            let mut item = item("entry", show_in_xfce);
+            item.hidden = hidden;
+            item.show_in_override = show_in_override;
+
+            assert_eq!(
+                item.is_enabled(),
+                expected,
+                "show_in_xfce {show_in_xfce}, hidden {hidden}, override {show_in_override}",
+            );
+        }
+    }
+
+    /// No directory holds a copy, so there is nothing to refuse: the C loop over
+    /// an empty list falls through to `TRUE` as well.
+    #[test]
+    fn is_removable_is_true_when_the_file_is_nowhere() {
+        assert!(item("no-such-entry-anywhere", true).is_removable());
+    }
+
+    #[test]
+    fn markup_appends_the_comment() {
+
+        let mut item = item("Screensaver", true);
+        assert_eq!(item.markup(), "Screensaver");
+
+        item.comment = "Lock the screen".to_string();
+        assert_eq!(item.markup(), "Screensaver (Lock the screen)");
+    }
+
+    /// Both halves end up inside markup, so both are escaped.
+    #[test]
+    fn markup_escapes_name_and_comment() {
+
+        let mut item = item("Cut & Paste", true);
+        item.comment = "<b>bold</b>".to_string();
+
+        assert_eq!(item.markup(), "Cut &amp; Paste (&lt;b&gt;bold&lt;/b&gt;)");
+    }
+
+    #[test]
+    fn markup_is_italic_outside_this_desktop() {
+
+        let mut item = item("Elsewhere", false);
+        assert_eq!(item.markup(), "<i>Elsewhere</i>");
+
+        item.comment = "Other desktop".to_string();
+        assert_eq!(item.markup(), "<i>Elsewhere (Other desktop)</i>");
+    }
+
+    #[test]
+    fn sort_default_puts_this_desktop_first() {
+
+        let ours = item("zzz", true);
+        let theirs = item("aaa", false);
+
+        assert_eq!(Item::sort_default(&ours, &theirs), Ordering::Less);
+        assert_eq!(Item::sort_default(&theirs, &ours), Ordering::Greater);
+    }
+
+    #[test]
+    fn sort_default_falls_back_to_the_name() {
+
+        for show_in_xfce in [true, false] {
+            let first = item("aaa", show_in_xfce);
+            let second = item("bbb", show_in_xfce);
+
+            assert_eq!(Item::sort_default(&first, &second), Ordering::Less);
+            assert_eq!(Item::sort_default(&second, &first), Ordering::Greater);
+            assert_eq!(Item::sort_default(&first, &first), Ordering::Equal);
+        }
+    }
+
+    /// Both `None` branches of [`Item::new`] that need no config file at all: a
+    /// path `XfceRc` cannot be handed, and one no config directory holds.
+    #[test]
+    fn new_is_none_without_a_desktop_file() {
+
+        assert!(Item::new("autostart/nul\0byte.desktop", "XFCE", "icon").is_none());
+        assert!(Item::new("autostart/xfce4-niri-no-such-entry.desktop", "XFCE", "icon").is_none());
+    }
+}

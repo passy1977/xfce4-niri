@@ -281,3 +281,89 @@ impl Drop for Rc {
         unsafe { xfce4util::xfce_rc_close(self.0) };
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    use super::*;
+    use crate::test_support::TempDir;
+
+    #[test]
+    fn glib_bool_maps_onto_the_c_constants() {
+        assert_eq!(glib_bool(true), GTRUE);
+        assert_eq!(glib_bool(false), GFALSE);
+    }
+
+    #[test]
+    fn from_strv_reads_a_null_vector_as_empty() {
+        assert!(unsafe { from_strv(ptr::null_mut()) }.is_empty());
+    }
+
+    /// Copies the strings out and hands the vector back to `g_strfreev`; run
+    /// under a leak checker this is the one that would catch a missing free.
+    #[test]
+    fn from_strv_copies_every_string() {
+
+        let source = vec!["first".to_string(), "second".to_string()];
+        let strv: *mut *mut c_char = source.to_glib_full();
+
+        assert_eq!(unsafe { from_strv(strv) }, source);
+    }
+
+    /// A `NUL` cannot be handed to C, and the C side never sees the call.
+    #[test]
+    fn an_interior_nul_is_refused_everywhere() {
+
+        assert!(resource_match("autostart/*\0.desktop", true).is_empty());
+        assert!(resource_lookup_all("autostart/nul\0byte.desktop").is_empty());
+        assert!(Rc::config_open("autostart/nul\0byte.desktop", true).is_none());
+        assert!(!is_accessible_dir(Path::new(OsStr::from_bytes(b"/tmp/nul\0byte"))));
+    }
+
+    /// `xfce_resource_match` matches nothing rather than failing on a pattern
+    /// no config directory can satisfy.
+    #[test]
+    fn resource_match_finds_nothing_for_an_unknown_pattern() {
+        assert!(resource_match("xfce4-niri-no-such-dir/*.desktop", true).is_empty());
+    }
+
+    #[test]
+    fn resource_lookup_all_finds_nothing_for_an_unknown_file() {
+        assert!(resource_lookup_all("autostart/xfce4-niri-no-such-entry.desktop").is_empty());
+    }
+
+    /// With no file in any config directory the open still hands back a view,
+    /// an empty one: what makes `Item::new` give up is the missing `Type` key,
+    /// not the open itself. Every read falls back.
+    #[test]
+    fn config_open_reads_nothing_when_the_file_is_nowhere() {
+
+        let rc = Rc::config_open("autostart/xfce4-niri-no-such-entry.desktop", true)
+            .expect("an empty view, not a failure");
+
+        rc.set_group(DESKTOP_ENTRY);
+
+        assert_eq!(rc.read_entry(c"Type"), None);
+        assert_eq!(rc.read_int_entry(c"RunHook", 42), 42);
+        assert!(rc.read_bool_entry(c"Hidden", true));
+        assert!(!rc.read_bool_entry(c"Hidden", false));
+        assert!(rc.read_list_entry(c"OnlyShowIn").is_empty());
+    }
+
+    #[test]
+    fn is_accessible_dir_wants_read_write_and_execute() {
+
+        let dir = TempDir::new();
+
+        assert!(is_accessible_dir(dir.path()));
+        assert!(!is_accessible_dir(&dir.path().join("missing")));
+
+        // Readable only: no write and no execute bit, which not even root gets
+        // past for `X_OK`.
+        assert!(!is_accessible_dir(&dir.file("read-only", 0o444)));
+    }
+}

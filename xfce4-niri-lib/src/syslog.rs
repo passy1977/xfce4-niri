@@ -105,3 +105,54 @@ impl SysLog {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    /// The discriminants are handed to `openlog` and `syslog` as they are, so
+    /// they have to be the `<syslog.h>` constants.
+    #[test]
+    fn the_constants_are_the_posix_ones() {
+
+        assert_eq!(Options::LogPid as c_int, 0x01);
+        assert_eq!(Options::LogCons as c_int, 0x02);
+        assert_eq!(Options::LogODelay as c_int, 0x04);
+        assert_eq!(Options::LogNDelay as c_int, 0x08);
+
+        assert_eq!(Facility::LogUser as c_int, 8);
+
+        assert_eq!(Priority::LogEmerg as c_int, 0);
+        assert_eq!(Priority::LogAlert as c_int, 1);
+        assert_eq!(Priority::LogCrit as c_int, 2);
+        assert_eq!(Priority::LogErr as c_int, 3);
+        assert_eq!(Priority::LogWarning as c_int, 4);
+        assert_eq!(Priority::LogNotice as c_int, 5);
+        assert_eq!(Priority::LogInfo as c_int, 6);
+        assert_eq!(Priority::LogDebug as c_int, 7);
+    }
+
+    /// Opening, logging and the `closelog` on drop have to hold together; a
+    /// message is written to the system log, which is what the service does.
+    #[test]
+    fn logging_goes_through() {
+
+        let log = SysLog::open(Options::LogPid as c_int | Options::LogCons as c_int);
+
+        log.syslog(Priority::LogDebug, "xfce4-niri-lib test message");
+        log.syslog_with_tag("test", Priority::LogDebug, "xfce4-niri-lib tagged test message");
+    }
+
+    /// A `NUL` cannot be handed to C: the message is dropped instead.
+    #[test]
+    fn a_message_with_an_interior_nul_is_dropped() {
+
+        let log = SysLog::open(Options::LogPid as c_int);
+
+        log.syslog(Priority::LogDebug, "nul\0byte");
+        log.syslog_with_tag("nul\0byte", Priority::LogDebug, "message");
+        log.syslog_with_tag("tag", Priority::LogDebug, "nul\0byte");
+    }
+}
