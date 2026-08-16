@@ -21,10 +21,9 @@
 use std::sync::Arc;
 
 use gtk::gio::Icon;
-use gtk::{ApplicationWindow, Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ScrolledWindow, SelectionMode, ShadowType, TreeViewColumn};
-use gtk::glib;
-use gtk::glib::StaticType;
-use gtk::Box;
+use gtk::gdk;
+use gtk::{ApplicationWindow, Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ScrolledWindow, SelectionMode, ShadowType, TreePath, TreeView, TreeViewColumn, Box};
+use gtk::glib::{self, Propagation, StaticType};
 use gtk::traits::{BoxExt, ButtonExt, CellRendererComboExt, CellRendererToggleExt, ContainerExt, GtkWindowExt, StyleContextExt, TreeSelectionExt, TreeViewColumnExt, TreeViewExt, WidgetExt};
 use gtk::prelude::{GtkListStoreExtManual, GtkListStoreExt, TreeViewColumnExt as Column};
 
@@ -52,7 +51,10 @@ mod col {
 pub(crate) struct Gui;
 
 impl Gui {
-    pub(crate) fn window_new(window: Arc<Mutex<ApplicationWindow>>, on_item_toggled: Arc<Mutex<fn(&gtk::ListStore, &gtk::TreePath) -> ()>>) -> Box {
+    pub(crate) fn window_new(window: Arc<Mutex<ApplicationWindow>>, 
+        on_item_toggled: Arc<Mutex<fn(&ListStore, &TreePath) -> ()>>,
+        on_right_click: Arc<Mutex<fn(&TreeView, &gdk::EventButton) -> Propagation>>
+    ) -> Box {
 
         let vbox = Box::builder()
             .orientation(Orientation::Vertical)
@@ -76,8 +78,8 @@ impl Gui {
             .build();
         swin.add(&tree_view);
 
-        //TODO: to handle 
-        //tree_view.connect_button_press_event(xfae_window_button_press_event);
+        let on_right_click_cb = on_right_click.clone();
+        tree_view.connect_button_press_event(*on_right_click_cb.lock().expect("Failed to lock on_right_click_cb mutex"));
         tree_view.connect_realize(|tree_view| tree_view.columns_autosize());
 
         let selection = tree_view.selection();
@@ -224,5 +226,15 @@ impl Gui {
         model
     }
 
+    fn create_combo_model() -> gtk::ListStore {
+
+        let model = gtk::ListStore::new(&[String::static_type()]);
+
+        for hook in RunHook::ALL {
+            model.set(&model.append(), &[(0, &hook.nick())]);
+        }
+
+        model
+    }
 
 }

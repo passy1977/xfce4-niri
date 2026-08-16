@@ -22,6 +22,7 @@ extern crate osal_rs;
 extern crate xfce4_niri_lib;
 
 mod data;
+mod gui_controller;
 mod gui;
 
 use std::error::Error;
@@ -37,6 +38,7 @@ use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 use crate::data::Data;
 use crate::gui::Gui;
+use crate::gui_controller::{on_item_toggled, on_right_click};
 
 const APP_ID: &str = "it.salsi.xfce-niri.AutoStart";
 
@@ -74,10 +76,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn on_item_toggled(_list_store: &gtk::ListStore, _tree_path: &gtk::TreePath) {
-    println!("Item toggled: {:?} {:?}", _list_store, _tree_path);
-}
-
 fn build_ui(app: &gtk::Application) {
     let window = Mutex::new_arc(
         gtk::ApplicationWindow::builder()
@@ -92,7 +90,8 @@ fn build_ui(app: &gtk::Application) {
     let window = window.lock().expect("Failed to lock window mutex");
     window.add(&Gui::window_new(
         window_clone.clone(), 
-    Mutex::new_arc(on_item_toggled)
+        Mutex::new_arc(on_item_toggled),
+    Mutex::new_arc(on_right_click)
     ));
     window.show_all();
 }
