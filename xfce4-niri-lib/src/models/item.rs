@@ -139,6 +139,7 @@ impl Item {
 mod tests {
 
     use super::*;
+    use crate::test_support::xfce_resource_ready;
 
     /// An item built by hand: [`Item::new`] needs a real `.desktop` file under
     /// the XFCE config directories, everything below is pure logic on the fields.
@@ -187,6 +188,7 @@ mod tests {
     /// an empty list falls through to `TRUE` as well.
     #[test]
     fn is_removable_is_true_when_the_file_is_nowhere() {
+        xfce_resource_ready();
         assert!(item("no-such-entry-anywhere", true).is_removable());
     }
 
@@ -247,6 +249,8 @@ mod tests {
     /// path `XfceRc` cannot be handed, and one no config directory holds.
     #[test]
     fn new_is_none_without_a_desktop_file() {
+
+        xfce_resource_ready();
 
         assert!(Item::new("autostart/nul\0byte.desktop", "XFCE", "icon").is_none());
         assert!(Item::new("autostart/xfce4-niri-no-such-entry.desktop", "XFCE", "icon").is_none());
