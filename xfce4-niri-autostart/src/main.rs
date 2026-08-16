@@ -31,6 +31,7 @@ use gtk::Application;
 use gtk::gio::prelude::ApplicationExtManual;
 use gtk::gio::traits::ApplicationExt;
 use gtk::traits::{WidgetExt, ContainerExt};
+use osal_rs::os::{Mutex, MutexFn};
 use xfce4_niri_lib::niri_check::NiriCheck;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
@@ -75,13 +76,24 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn build_ui(app: &gtk::Application) {
 
-    let window = gtk::ApplicationWindow::builder()
+    static mut GUI: Option<Gui> = None;
+
+    let window = Mutex::new_arc(
+        gtk::ApplicationWindow::builder()
         .application(app)
         .title("Xfce4-niri Autostart")
         .default_width(600)
         .default_height(450)
-        .build();
+        .build()
+    );
 
-    window.add(&Gui::window_new());
+    let window_clone = window.clone();
+    let (gui, gtk_box) = Gui::window_new(window_clone.clone());
+    unsafe {
+        GUI = Some(gui);
+    }
+    
+    let window = window.lock().expect("Failed to lock window mutex");
+    window.add(&gtk_box);
     window.show_all();
 }

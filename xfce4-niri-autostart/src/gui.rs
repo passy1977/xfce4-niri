@@ -18,14 +18,17 @@
  *
  ***************************************************************************/
 
+use std::sync::Arc;
+
 use gtk::gio::Icon;
-use gtk::{Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ScrolledWindow, SelectionMode, ShadowType, TreeViewColumn};
+use gtk::{ApplicationWindow, Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ScrolledWindow, SelectionMode, ShadowType, TreeViewColumn};
 use gtk::glib;
 use gtk::glib::StaticType;
 use gtk::Box;
-use gtk::traits::{ButtonExt, CellRendererComboExt, StyleContextExt, BoxExt, CellRendererToggleExt, ContainerExt, TreeSelectionExt, TreeViewColumnExt, TreeViewExt, WidgetExt};
+use gtk::traits::{BoxExt, ButtonExt, CellRendererComboExt, CellRendererToggleExt, ContainerExt, GtkWindowExt, StyleContextExt, TreeSelectionExt, TreeViewColumnExt, TreeViewExt, WidgetExt};
 use gtk::prelude::{GtkListStoreExtManual, GtkListStoreExt, TreeViewColumnExt as Column};
 
+use osal_rs::os::{Mutex, MutexFn};
 use xfce4_niri_lib::fxce::resource_match;
 use xfce4_niri_lib::models::item::Item;
 
@@ -49,123 +52,142 @@ mod col {
 pub(crate) struct Gui;
 
 impl Gui {
-    pub(crate) fn window_new() -> Box {
+    pub(crate) fn window_new(window: Arc<Mutex<ApplicationWindow>>) -> (Self, Box) {
 
-    let vbox = Box::builder()
-        .orientation(Orientation::Vertical)
-        .spacing(0)
-        .border_width(12)
-        .build();
+        let vbox = Box::builder()
+            .orientation(Orientation::Vertical)
+            .spacing(0)
+            .border_width(12)
+            .build();
 
-    let swin = ScrolledWindow::builder()
-        .shadow_type(ShadowType::In)
-        .vscrollbar_policy(PolicyType::Automatic)
-        .hscrollbar_policy(PolicyType::Automatic)
-        .build();
-    vbox.pack_start(&swin, true, true, 0);
+        let swin = ScrolledWindow::builder()
+            .shadow_type(ShadowType::In)
+            .vscrollbar_policy(PolicyType::Automatic)
+            .hscrollbar_policy(PolicyType::Automatic)
+            .build();
+        vbox.pack_start(&swin, true, true, 0);
 
-    let model = Self::model_new();
+        let model = Self::model_new();
 
-    let tree_view = gtk::TreeView::builder()
-        .model(&model)
-        .headers_visible(true)
-        .tooltip_column(col::TOOLTIP as i32)
-        .build();
-    swin.add(&tree_view);
+        let tree_view = gtk::TreeView::builder()
+            .model(&model)
+            .headers_visible(true)
+            .tooltip_column(col::TOOLTIP as i32)
+            .build();
+        swin.add(&tree_view);
 
-    //TODO: to handle 
-    //tree_view.connect_button_press_event(xfae_window_button_press_event);
-    tree_view.connect_realize(|tree_view| tree_view.columns_autosize());
+        //TODO: to handle 
+        //tree_view.connect_button_press_event(xfae_window_button_press_event);
+        tree_view.connect_realize(|tree_view| tree_view.columns_autosize());
 
-    let selection = tree_view.selection();
-    selection.set_mode(SelectionMode::Single);
+        let selection = tree_view.selection();
+        selection.set_mode(SelectionMode::Single);
 
-    let column = TreeViewColumn::builder().reorderable(false).resizable(false).build();
-    let renderer = CellRendererToggle::new();
-    renderer.connect_toggled(glib::clone!(@weak model => move |_, _path| {
+        let column = TreeViewColumn::builder().reorderable(false).resizable(false).build();
+        let renderer = CellRendererToggle::new();
+        renderer.connect_toggled(glib::clone!(@weak model => move |_, _path| {
+            //TODO: to handle
+            //xfae_window_item_toggled(&model, &path);
+        }));
+        Column::pack_start(&column, &renderer, false);
+        Column::add_attribute(&column, &renderer, "active", col::ENABLED as i32);
+        column.set_sort_column_id(col::ENABLED as i32);
+        tree_view.append_column(&column);
+
+        // Column: icon and name of the program.
+        let column = TreeViewColumn::builder()
+            .title("Program")
+            .reorderable(false)
+            .resizable(false)
+            .expand(true)
+            .build();
+        let renderer = CellRendererPixbuf::new();
+        Column::pack_start(&column, &renderer, false);
+        Column::add_attribute(&column, &renderer, "gicon", col::ICON as i32);
+        let renderer = CellRendererText::builder().ellipsize(gtk::pango::EllipsizeMode::End).build();
+        Column::pack_start(&column, &renderer, true);
+        Column::add_attribute(&column, &renderer, "markup", col::NAME as i32);
+        column.set_sort_column_id(col::NAME as i32);
+        tree_view.append_column(&column);
+
+        // Column: the trigger, editable through a combo inside the cell.
+        let column = TreeViewColumn::builder()
+            .title("Trigger")
+            .reorderable(false)
+            .resizable(false)
+            .build();
+        let renderer = CellRendererCombo::builder()
+            .has_entry(false)
+            //TODO: to handle
+            //.model(&xfae_window_create_run_hooks_combo_model())
+            .text_column(0)
+            .editable(true)
+            .mode(CellRendererMode::Editable)
+            .build();
+        renderer.connect_changed(glib::clone!(@weak model => move |_combo, _path, _combo_iter| {
+            //TODO: to handle
+            //run_hook_changed(&model, combo, &path, combo_iter);
+        }));
+        Column::pack_start(&column, &renderer, false);
+        Column::add_attribute(&column, &renderer, "text", col::RUN_HOOK as i32);
+        column.set_sort_column_id(col::RUN_HOOK as i32);
+        tree_view.append_column(&column);
+
+        // The inline toolbar.
+        let bbox = Box::new(Orientation::Horizontal, 0);
+        bbox.style_context().add_class("inline-toolbar");
+        vbox.pack_start(&bbox, false, true, 0);
+
+        let button = |label, icon, tooltip| {
+            let button = Button::with_label(label);
+            button.set_image(Some(&Image::from_icon_name(Some(icon), IconSize::Button)));
+            button.set_tooltip_text(Some(tooltip));
+            button
+        };
+
+        let add = button("Add", "list-add-symbolic", "Add application");
         //TODO: to handle
-        //xfae_window_item_toggled(&model, &path);
-    }));
-    Column::pack_start(&column, &renderer, false);
-    Column::add_attribute(&column, &renderer, "active", col::ENABLED as i32);
-    column.set_sort_column_id(col::ENABLED as i32);
-    tree_view.append_column(&column);
+        // add.connect_clicked(glib::clone!(@weak tree_view => move |_| xfae_window_add(&tree_view)));
+        bbox.pack_start(&add, false, false, 0);
 
-    // Column: icon and name of the program.
-    let column = TreeViewColumn::builder()
-        .title("Program")
-        .reorderable(false)
-        .resizable(false)
-        .expand(true)
-        .build();
-    let renderer = CellRendererPixbuf::new();
-    Column::pack_start(&column, &renderer, false);
-    Column::add_attribute(&column, &renderer, "gicon", col::ICON as i32);
-    let renderer = CellRendererText::builder().ellipsize(gtk::pango::EllipsizeMode::End).build();
-    Column::pack_start(&column, &renderer, true);
-    Column::add_attribute(&column, &renderer, "markup", col::NAME as i32);
-    column.set_sort_column_id(col::NAME as i32);
-    tree_view.append_column(&column);
-
-    // Column: the trigger, editable through a combo inside the cell.
-    let column = TreeViewColumn::builder()
-        .title("Trigger")
-        .reorderable(false)
-        .resizable(false)
-        .build();
-    let renderer = CellRendererCombo::builder()
-        .has_entry(false)
+        let remove = button("Remove", "list-remove-symbolic", "Remove application");
         //TODO: to handle
-        //.model(&xfae_window_create_run_hooks_combo_model())
-        .text_column(0)
-        .editable(true)
-        .mode(CellRendererMode::Editable)
-        .build();
-    renderer.connect_changed(glib::clone!(@weak model => move |_combo, _path, _combo_iter| {
+        // remove.connect_clicked(glib::clone!(@weak tree_view => move |_| xfae_window_remove(&tree_view)));
+        bbox.pack_start(&remove, false, false, 0);
+
+        let edit = button("Edit", "document-edit-symbolic", "Edit application");
         //TODO: to handle
-        //run_hook_changed(&model, combo, &path, combo_iter);
-    }));
-    Column::pack_start(&column, &renderer, false);
-    Column::add_attribute(&column, &renderer, "text", col::RUN_HOOK as i32);
-    column.set_sort_column_id(col::RUN_HOOK as i32);
-    tree_view.append_column(&column);
+        // edit.connect_clicked(glib::clone!(@weak tree_view => move |_| xfae_window_edit(&tree_view)));
+        bbox.pack_start(&edit, false, false, 0);
 
-    // The inline toolbar.
-    let bbox = Box::new(Orientation::Horizontal, 0);
-    bbox.style_context().add_class("inline-toolbar");
-    vbox.pack_start(&bbox, false, true, 0);
-
-    let button = |label, icon, tooltip| {
-        let button = Button::with_label(label);
-        button.set_image(Some(&Image::from_icon_name(Some(icon), IconSize::Button)));
-        button.set_tooltip_text(Some(tooltip));
-        button
-    };
-
-    let add = button("Add", "list-add-symbolic", "Add application");
-    //TODO: to handle
-    // add.connect_clicked(glib::clone!(@weak tree_view => move |_| xfae_window_add(&tree_view)));
-    bbox.pack_start(&add, false, false, 0);
-
-    let remove = button("Remove", "list-remove-symbolic", "Remove application");
-    //TODO: to handle
-    // remove.connect_clicked(glib::clone!(@weak tree_view => move |_| xfae_window_remove(&tree_view)));
-    bbox.pack_start(&remove, false, false, 0);
-
-    let edit = button("Edit", "document-edit-symbolic", "Edit application");
-    //TODO: to handle
-    // edit.connect_clicked(glib::clone!(@weak tree_view => move |_| xfae_window_edit(&tree_view)));
-    bbox.pack_start(&edit, false, false, 0);
-
-    // Both buttons follow the selection, as in `xfae_window_init`.
-    selection.connect_changed(glib::clone!(@weak remove, @weak edit => move |_selection| {
+        // Both buttons follow the selection, as in `xfae_window_init`.
+        selection.connect_changed(glib::clone!(@weak remove, @weak edit => move |_selection| {
+            //TODO: to handle
+            // xfae_window_selection_changed(selection, &remove, &edit);
+        }));
         //TODO: to handle
-        // xfae_window_selection_changed(selection, &remove, &edit);
-    }));
-    //TODO: to handle
-    // xfae_window_selection_changed(&selection, &remove, &edit);
+        // xfae_window_selection_changed(&selection, &remove, &edit);
 
-    vbox
+
+        let v_close_box = Box::builder()
+            .orientation(Orientation::Horizontal)
+            .spacing(0)
+            
+            .build();
+
+
+
+        let window = window.clone();
+        let close = button("Close", "window-close-symbolic", "Close application");
+        close.connect_clicked(move |_| {
+            window.lock().unwrap().close();
+        });
+        close.set_margin_top(12);
+        v_close_box.pack_end(&close, false, false, 0);
+        vbox.pack_start(&v_close_box, false, false, 0);
+        
+
+        (Self, vbox)
 
     }
 
