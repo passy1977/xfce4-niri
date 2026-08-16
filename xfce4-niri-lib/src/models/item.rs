@@ -23,24 +23,25 @@ use std::path::Path;
 
 use gtk::gio::{Icon, ThemedIcon};
 use gtk::glib::{Cast, IntoGStr, markup_escape_text};
-use xfce4_niri_lib::fxce::{DESKTOP_ENTRY, Rc, resource_lookup_all};
+use crate::fxce::{DESKTOP_ENTRY, Rc, is_accessible_dir, resource_lookup_all};
 
-use crate::gui::{DEFAULT_ICON, DESKTOP, binary_exists};
+use crate::binary_exists;
+// use crate::gui::{DEFAULT_ICON, DESKTOP, binary_exists, is_accessible_dir};
 use crate::models::run_hook::RunHook;
 
 
 /// Port of `XfaeItem`: one `autostart/*.desktop` file, as read through
 /// `XfceRc` — so a user file overriding a system one reads as a single entry.
-pub(crate) struct Item {
-    pub (crate) name: String,
-    pub (crate) icon: Icon,
-    pub (crate) comment: String,
-    pub (crate) rel_path: String,
-    pub (crate) hidden: bool,
-    pub (crate) tooltip: String,
-    pub (crate) run_hook: RunHook,
-    pub (crate) show_in_xfce: bool,
-    pub (crate) show_in_override: bool,
+pub struct Item {
+    pub name: String,
+    pub icon: Icon,
+    pub comment: String,
+    pub rel_path: String,
+    pub hidden: bool,
+    pub tooltip: String,
+    pub run_hook: RunHook,
+    pub show_in_xfce: bool,
+    pub show_in_override: bool
 }
 
 impl Item {
@@ -48,7 +49,7 @@ impl Item {
     /// Port of `xfae_item_new`: `None` for anything the C code skips, i.e. a
     /// non `Application` entry, one hidden from this desktop by `NotShowIn`,
     /// or one whose `TryExec` binary is missing.
-    pub(crate) fn new(rel_path: &str) -> Option<Self> {
+    pub fn new(rel_path: &str, desktop: &str, default_icon: &str) -> Option<Self> {
 
         let rc = Rc::config_open(rel_path, true)?;
         rc.set_group(DESKTOP_ENTRY);
@@ -57,7 +58,7 @@ impl Item {
             return None
         }
 
-        let icon = rc.read_entry(c"Icon").unwrap_or_else(|| DEFAULT_ICON.to_string());
+        let icon = rc.read_entry(c"Icon").unwrap_or_else(|| default_icon.to_string());
         let command = rc.read_entry(c"Exec").unwrap_or_default();
 
         let mut item = Self {
@@ -72,14 +73,14 @@ impl Item {
             show_in_override: rc.read_bool_entry(c"X-XFCE-Autostart-Override", false),
         };
 
-        if rc.read_list_entry(c"NotShowIn").iter().any(|it| it.eq_ignore_ascii_case(DESKTOP)) {
+        if rc.read_list_entry(c"NotShowIn").iter().any(|it| it.eq_ignore_ascii_case(desktop)) {
             return None
         }
 
         // No `OnlyShowIn` at all means "every desktop", so the entry is ours.
         let only_show_in = rc.read_list_entry(c"OnlyShowIn");
         item.show_in_xfce = only_show_in.is_empty()
-            || only_show_in.iter().any(|it| it.eq_ignore_ascii_case(DESKTOP));
+            || only_show_in.iter().any(|it| it.eq_ignore_ascii_case(desktop));
 
         if let Some(try_exec) = rc.read_entry(c"TryExec")
             && !binary_exists(&try_exec) {
@@ -91,7 +92,7 @@ impl Item {
 
     /// Port of `xfae_item_is_enabled`: an entry not meant for this desktop
     /// needs the `X-XFCE-Autostart-Override` opt in on top of not being hidden.
-    pub(crate) fn is_enabled(&self) -> bool {
+    pub fn is_enabled(&self) -> bool {
         if self.show_in_xfce {
             !self.hidden
         } else {
@@ -101,15 +102,15 @@ impl Item {
 
     /// Port of `xfae_item_is_removable`: removable only while every directory
     /// holding a copy of the file can be written to.
-    pub(crate) fn is_removable(&self) -> bool {
+    pub fn is_removable(&self) -> bool {
         resource_lookup_all(&self.rel_path)
             .iter()
-            .all(|file| Path::new(file).parent().is_some_and(xfce4_niri_lib::fxce::is_accessible_dir))
+            .all(|file| Path::new(file).parent().is_some_and(is_accessible_dir))
     }
 
     /// The markup `xfae_model_get_value` builds for `XFAE_MODEL_COLUMN_NAME`:
     /// "name (comment)", in italics when the entry is not shown on this desktop.
-    pub(crate) fn markup(&self) -> String {
+    pub fn markup(&self) -> String {
 
         let name = markup_escape_text(&self.name);
 
@@ -124,7 +125,7 @@ impl Item {
 
     /// Port of `xfae_item_sort_default`: entries for this desktop first, then
     /// by name.
-    pub(crate) fn sort_default(a: &Self, b: &Self) -> Ordering {
+    pub fn sort_default(a: &Self, b: &Self) -> Ordering {
         match (a.show_in_xfce, b.show_in_xfce) {
             (true, false) => Ordering::Less,
             (false, true) => Ordering::Greater,

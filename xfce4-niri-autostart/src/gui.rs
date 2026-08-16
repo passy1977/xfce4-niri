@@ -17,10 +17,6 @@
  * License along with this library; if not, see <https://www.gnu.org/licenses/>.
  *
  ***************************************************************************/
-#![allow(dead_code)]
-#![allow(unused)]
-
-use std::path::Path;
 
 use gtk::gio::Icon;
 use gtk::{Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ScrolledWindow, SelectionMode, ShadowType, TreeViewColumn};
@@ -29,9 +25,10 @@ use gtk::glib::StaticType;
 use gtk::Box;
 use gtk::traits::{ButtonExt, CellRendererComboExt, StyleContextExt, BoxExt, CellRendererToggleExt, ContainerExt, TreeSelectionExt, TreeViewColumnExt, TreeViewExt, WidgetExt};
 use gtk::prelude::{GtkListStoreExtManual, GtkListStoreExt, TreeViewColumnExt as Column};
-use xfce4_niri_lib::fxce::{self, resource_match};
 
-use crate::models::item::Item;
+use xfce4_niri_lib::fxce::resource_match;
+use xfce4_niri_lib::models::item::Item;
+
 
 /// `xfce_rc_read_entry (rc, "Icon", "application-x-executable")`.
 pub(crate) const DEFAULT_ICON: &str = "application-x-executable";
@@ -47,20 +44,6 @@ mod col {
     pub const TOOLTIP: u32 = 4;
     pub const RUN_HOOK: u32 = 5;
     pub const RELPATH: u32 = 6;
-}
-
-/// `g_shell_parse_argv` + `g_find_program_in_path` on a `TryExec` value.
-pub(super) fn binary_exists(try_exec: &str) -> bool {
-
-    let Ok(argv) = glib::shell_parse_argv(try_exec) else {
-        return true // Unparsable: the C code leaves the entry alone.
-    };
-
-    let Some(program) = argv.first() else {
-        return true
-    };
-
-    Path::new(program).exists() || glib::find_program_in_path(program).is_some()
 }
 
 pub(crate) struct Gui;
@@ -200,7 +183,7 @@ impl Gui {
 
         let mut items = resource_match("autostart/*.desktop", true)
             .iter()
-            .filter_map(|relpath| Item::new(relpath))
+            .filter_map(|rel_path| Item::new(rel_path, DESKTOP, DEFAULT_ICON))
             .collect::<Vec<_>>();
 
         items.sort_by(Item::sort_default);

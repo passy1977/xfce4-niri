@@ -226,15 +226,20 @@ fn current_desktops() -> Vec<String> {
 
 fn binary_exists(binary: &str) -> bool {
 
-    if binary.contains('/') {
-        return Path::new(binary).is_file()
-    }
+    let Ok(argv) = glib::shell_parse_argv(binary) else {
+        return true // Unparsable: the C code leaves the entry alone.
+    };
 
-    env::var("PATH")
-        .unwrap_or_default()
-        .split(':')
-        .any(|dir| Path::new(dir).join(binary).is_file())
+    let Some(program) = argv.first() else {
+        return true
+    };
+
+    let path = Path::new(program);
+
+    (path.exists() && path.is_file()) || glib::find_program_in_path(program).is_some()
 }
+
+
 
 fn user_autostart_dir() -> PathBuf {
 
