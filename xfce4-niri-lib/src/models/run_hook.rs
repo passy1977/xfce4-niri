@@ -43,7 +43,7 @@ pub enum RunHook {
 impl RunHook {
 
     /// In `GEnumValue` order, the order the combo boxes list them in.
-    const ALL: [Self; 7] = [
+    pub const ALL: [Self; 7] = [
         Self::Login,
         Self::Logout,
         Self::Shutdown,
