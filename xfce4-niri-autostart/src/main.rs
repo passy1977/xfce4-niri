@@ -74,10 +74,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn on_item_toggled(_list_store: &gtk::ListStore, _tree_path: &gtk::TreePath) {
+    println!("Item toggled: {:?} {:?}", _list_store, _tree_path);
+}
+
 fn build_ui(app: &gtk::Application) {
-
-    static mut GUI: Option<Gui> = None;
-
     let window = Mutex::new_arc(
         gtk::ApplicationWindow::builder()
         .application(app)
@@ -87,13 +88,11 @@ fn build_ui(app: &gtk::Application) {
         .build()
     );
 
-    let window_clone = window.clone();
-    let (gui, gtk_box) = Gui::window_new(window_clone.clone());
-    unsafe {
-        GUI = Some(gui);
-    }
-    
+    let window_clone = window.clone();    
     let window = window.lock().expect("Failed to lock window mutex");
-    window.add(&gtk_box);
+    window.add(&Gui::window_new(
+        window_clone.clone(), 
+    Mutex::new_arc(on_item_toggled)
+    ));
     window.show_all();
 }

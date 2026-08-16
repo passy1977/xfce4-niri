@@ -52,7 +52,7 @@ mod col {
 pub(crate) struct Gui;
 
 impl Gui {
-    pub(crate) fn window_new(window: Arc<Mutex<ApplicationWindow>>) -> (Self, Box) {
+    pub(crate) fn window_new(window: Arc<Mutex<ApplicationWindow>>, on_item_toggled: Arc<Mutex<fn(&gtk::ListStore, &gtk::TreePath) -> ()>>) -> Box {
 
         let vbox = Box::builder()
             .orientation(Orientation::Vertical)
@@ -85,9 +85,11 @@ impl Gui {
 
         let column = TreeViewColumn::builder().reorderable(false).resizable(false).build();
         let renderer = CellRendererToggle::new();
-        renderer.connect_toggled(glib::clone!(@weak model => move |_, _path| {
-            //TODO: to handle
-            //xfae_window_item_toggled(&model, &path);
+        
+        let on_item_toggled_cb = on_item_toggled.clone();
+        renderer.connect_toggled(glib::clone!(@weak model => move |_, path| {
+            let callback = on_item_toggled_cb.lock().expect("Failed to lock on_item_toggled mutex");
+            (*callback)(&model, &path);
         }));
         Column::pack_start(&column, &renderer, false);
         Column::add_attribute(&column, &renderer, "active", col::ENABLED as i32);
@@ -172,10 +174,7 @@ impl Gui {
         let v_close_box = Box::builder()
             .orientation(Orientation::Horizontal)
             .spacing(0)
-            
             .build();
-
-
 
         let window = window.clone();
         let close = button("Close", "window-close-symbolic", "Close application");
@@ -187,7 +186,7 @@ impl Gui {
         vbox.pack_start(&v_close_box, false, false, 0);
         
 
-        (Self, vbox)
+        vbox
 
     }
 
