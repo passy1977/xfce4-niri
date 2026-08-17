@@ -56,6 +56,21 @@ mod col {
 pub(crate) struct Gui;
 
 impl Gui {
+
+    fn cell_string(model: &impl IsA<gtk::TreeModel>, iter: &gtk::TreeIter, column: u32) -> String {
+        model.value(iter, column as i32).get::<String>().unwrap_or_default()
+    }
+
+    fn cell_bool(model: &impl IsA<gtk::TreeModel>, iter: &gtk::TreeIter, column: u32) -> bool {
+        model.value(iter, column as i32).get::<bool>().unwrap_or_default()
+    }
+
+    /// `gtk_widget_get_toplevel`, as far as it is a window: the parent the dialogs
+    /// and the error dialog are transient for.
+    fn toplevel(widget: &impl IsA<gtk::Widget>) -> Option<gtk::Window> {
+        widget.toplevel().and_then(|it| it.downcast::<gtk::Window>().ok())
+    }
+
     pub(crate) fn window_new(window: Arc<Mutex<ApplicationWindow>>, 
         _on_item_toggled: Arc<Mutex<fn(&ListStore, &TreePath) -> ()>>,
         _on_right_click: Arc<Mutex<fn(&TreeView, &gdk::EventButton) -> Propagation>>
@@ -74,7 +89,7 @@ impl Gui {
             .build();
         vbox.pack_start(&swin, true, true, 0);
 
-        let model = Self::model_new();
+        let model = Self::new_tree_view_model();
 
         let tree_view = gtk::TreeView::builder()
             .model(&model)
@@ -85,7 +100,7 @@ impl Gui {
 
         // let on_right_click_cb = on_right_click.clone();
         // tree_view.connect_button_press_event(*on_right_click_cb.lock().expect("Failed to lock on_right_click_cb mutex"));
-        tree_view.connect_button_press_event(Self::button_right_click);
+        tree_view.connect_button_press_event(Self::on_mouse_right_click);
         tree_view.connect_realize(|tree_view| tree_view.columns_autosize());
 
         let selection = tree_view.selection();
@@ -99,7 +114,7 @@ impl Gui {
         //     (*callback)(&model, &path);
         // }));
         renderer.connect_toggled(glib::clone!(@weak model => move |_, path| {
-            Self::item_toggled(&model, &path);
+            Self::on_tree_cell_item_toggled(&model, &path);
         }));
 
         Column::pack_start(&column, &renderer, false);
@@ -131,13 +146,13 @@ impl Gui {
             .build();
         let renderer = CellRendererCombo::builder()
             .has_entry(false)
-            .model(&Self::create_combo_model())
+            .model(&Self::new_combo_model())
             .text_column(0)
             .editable(true)
             .mode(CellRendererMode::Editable)
             .build();
         renderer.connect_changed(glib::clone!(@weak model => move |combo, path, combo_iter| {
-            Self::item_combo_changed(&model, combo, &path, combo_iter);
+            Self::on_combo_changed(&model, combo, &path, combo_iter);
         }));
         Column::pack_start(&column, &renderer, false);
         Column::add_attribute(&column, &renderer, "text", col::RUN_HOOK as i32);
@@ -157,21 +172,21 @@ impl Gui {
         };
 
         let add = button("Add", "list-add-symbolic", "Add application");
-        add.connect_clicked(glib::clone!(@weak tree_view => move |_| Self::on_add_clicked(&tree_view)));
+        add.connect_clicked(glib::clone!(@weak tree_view => move |_| Self::on_button_add_clicked(&tree_view)));
         bbox.pack_start(&add, false, false, 0);
 
         let remove = button("Remove", "list-remove-symbolic", "Remove application");
-        remove.connect_clicked(glib::clone!(@weak tree_view => move |_| Self::on_remove_clicked(&tree_view)));
+        remove.connect_clicked(glib::clone!(@weak tree_view => move |_| Self::on_button_remove_clicked(&tree_view)));
         bbox.pack_start(&remove, false, false, 0);
 
         let edit = button("Edit", "document-edit-symbolic", "Edit application");
-        edit.connect_clicked(glib::clone!(@weak tree_view => move |_| Self::on_edit_clicked(&tree_view)));
+        edit.connect_clicked(glib::clone!(@weak tree_view => move |_| Self::on_button_edit_clicked(&tree_view)));
         bbox.pack_start(&edit, false, false, 0);
 
         selection.connect_changed(glib::clone!(@weak remove, @weak edit => move |selection| {
-            Self::xfae_window_selection_changed(selection, &remove, &edit);
+            Self::on_tree_view_selection_changed(selection, &remove, &edit);
         }));
-        Self::xfae_window_selection_changed(&selection, &remove, &edit);
+        Self::on_tree_view_selection_changed(&selection, &remove, &edit);
 
 
         let v_close_box = Box::builder()
@@ -193,7 +208,40 @@ impl Gui {
 
     }
 
-    fn model_new() -> ListStore {
+    fn new_combo_model() -> gtk::ListStore {
+
+        let model = gtk::ListStore::new(&[String::static_type()]);
+
+        for hook in RunHook::ALL {
+            model.set(&model.append(), &[(0, &hook.nick())]);
+        }
+
+        model
+    }
+
+    /// Port of `xfae_model_get`: reads back the entry behind a row, which is what
+    /// the edit dialog is filled with.
+    fn tree_view_model_get(relpath: &str) -> Result<(String, String, String, RunHook), glib::Error> {
+
+        let Some(rc) = xfce::Rc::config_open(relpath, true) else {
+            return Err(glib::Error::new(
+                glib::FileError::Io,
+                &format!("Failed to open {relpath} for reading"),
+            ))
+        };
+
+        rc.set_group(xfce::DESKTOP_ENTRY);
+
+        Ok((
+            rc.read_entry(c"Name").unwrap_or_default(),
+            rc.read_entry(c"Comment").unwrap_or_default(),
+            rc.read_entry(c"Exec").unwrap_or_default(),
+            RunHook::from_value(rc.read_int_entry(c"RunHook", RunHook::Login.value())),
+        ))
+    }
+
+
+    fn new_tree_view_model() -> ListStore {
 
         let model = ListStore::new(&[
             Icon::static_type(),        // ICON
@@ -226,23 +274,8 @@ impl Gui {
 
         model
     }
-    
 
-    fn cell_string(model: &impl IsA<gtk::TreeModel>, iter: &gtk::TreeIter, column: u32) -> String {
-        model.value(iter, column as i32).get::<String>().unwrap_or_default()
-    }
-
-    fn cell_bool(model: &impl IsA<gtk::TreeModel>, iter: &gtk::TreeIter, column: u32) -> bool {
-        model.value(iter, column as i32).get::<bool>().unwrap_or_default()
-    }
-
-    /// `gtk_widget_get_toplevel`, as far as it is a window: the parent the dialogs
-    /// and the error dialog are transient for.
-    fn toplevel(widget: &impl IsA<gtk::Widget>) -> Option<gtk::Window> {
-        widget.toplevel().and_then(|it| it.downcast::<gtk::Window>().ok())
-    }
-
-    fn item_toggled(
+    fn on_tree_cell_item_toggled(
         model: &gtk::ListStore, 
         path: &gtk::TreePath
     ) {
@@ -256,7 +289,7 @@ impl Gui {
     }
 
 
-    fn item_add(tree_view: &gtk::TreeView) {
+    fn on_menu_add_clicked(tree_view: &gtk::TreeView) {
 
         let parent = Self::toplevel(tree_view);
         let dialog = Dialog::new(parent.as_ref(), None, None, None, RunHook::Login);
@@ -269,7 +302,7 @@ impl Gui {
         dialog.destroy();
     }
 
-    fn item_remove(tree_view: &gtk::TreeView) {
+    fn on_menu_remove_clicked(tree_view: &gtk::TreeView) {
 
         let Some((model, iter)) = tree_view.selection().selected() else {
             return
@@ -283,7 +316,7 @@ impl Gui {
     }
 
 
-    fn button_right_click(
+    fn on_mouse_right_click(
         tree_view: &gtk::TreeView,
         event: &gtk::gdk::EventButton,
     ) -> glib::Propagation {
@@ -307,11 +340,11 @@ impl Gui {
         let menu = gtk::Menu::new();
 
         let add = gtk::MenuItem::with_label("Add");
-        add.connect_activate(glib::clone!(@weak tree_view => move |_| Self::item_add(&tree_view)));
+        add.connect_activate(glib::clone!(@weak tree_view => move |_| Self::on_menu_add_clicked(&tree_view)));
         menu.append(&add);
 
         let remove = gtk::MenuItem::with_label("Remove");
-        remove.connect_activate(glib::clone!(@weak tree_view => move |_| Self::item_remove(&tree_view)));
+        remove.connect_activate(glib::clone!(@weak tree_view => move |_| Self::on_menu_remove_clicked(&tree_view)));
         remove.set_sensitive(removable);
         menu.append(&remove);
 
@@ -325,19 +358,7 @@ impl Gui {
         glib::Propagation::Stop
     }
 
-
-    fn create_combo_model() -> gtk::ListStore {
-
-        let model = gtk::ListStore::new(&[String::static_type()]);
-
-        for hook in RunHook::ALL {
-            model.set(&model.append(), &[(0, &hook.nick())]);
-        }
-
-        model
-    }
-
-    fn item_combo_changed(
+    fn on_combo_changed(
         model: &gtk::ListStore,
         combo: &gtk::CellRendererCombo,
         path: &gtk::TreePath,
@@ -356,7 +377,7 @@ impl Gui {
         model.set_value(&iter, col::RUN_HOOK, &nick.to_value());
     }
 
-    fn on_add_clicked(tree_view: &gtk::TreeView) {
+    fn on_button_add_clicked(tree_view: &gtk::TreeView) {
 
         let parent = Self::toplevel(tree_view);
         let dialog = Dialog::new(parent.as_ref(), None, None, None, RunHook::Login);
@@ -369,7 +390,7 @@ impl Gui {
         dialog.destroy();
     }
 
-    fn on_remove_clicked(tree_view: &gtk::TreeView) {
+    fn on_button_remove_clicked(tree_view: &gtk::TreeView) {
 
         let Some((model, iter)) = tree_view.selection().selected() else {
             return
@@ -382,28 +403,7 @@ impl Gui {
         model.remove(&iter);
     }
 
-    /// Port of `xfae_model_get`: reads back the entry behind a row, which is what
-    /// the edit dialog is filled with.
-    fn model_get(relpath: &str) -> Result<(String, String, String, RunHook), glib::Error> {
-
-        let Some(rc) = xfce::Rc::config_open(relpath, true) else {
-            return Err(glib::Error::new(
-                glib::FileError::Io,
-                &format!("Failed to open {relpath} for reading"),
-            ))
-        };
-
-        rc.set_group(xfce::DESKTOP_ENTRY);
-
-        Ok((
-            rc.read_entry(c"Name").unwrap_or_default(),
-            rc.read_entry(c"Comment").unwrap_or_default(),
-            rc.read_entry(c"Exec").unwrap_or_default(),
-            RunHook::from_value(rc.read_int_entry(c"RunHook", RunHook::Login.value())),
-        ))
-    }
-
-    fn on_edit_clicked(tree_view: &gtk::TreeView) {
+    fn on_button_edit_clicked(tree_view: &gtk::TreeView) {
 
         let parent = Self::toplevel(tree_view);
 
@@ -413,7 +413,7 @@ impl Gui {
 
         let rel_path = Self::cell_string(&model, &iter, col::RELPATH);
 
-        let (name, descr, command, run_hook) = match Self::model_get(&rel_path) {
+        let (name, descr, command, run_hook) = match Self::tree_view_model_get(&rel_path) {
             Ok(entry) => entry,
             Err(error) => {
                 xfce::show_error(parent.as_ref(), Some(&error), "Failed to edit item");
@@ -446,7 +446,7 @@ impl Gui {
     /// list. Here Edit only asks for a selected row: the entry is opened read only
     /// anyway, and its `Exec` is worth looking at even when the file cannot be
     /// rewritten in place.
-    fn xfae_window_selection_changed(
+    fn on_tree_view_selection_changed(
         selection: &gtk::TreeSelection,
         remove: &gtk::Button,
         edit: &gtk::Button,
