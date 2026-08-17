@@ -44,13 +44,13 @@ pub(crate) const DEFAULT_ICON: &str = "application-x-executable";
 pub(crate) const DESKTOP: &str = "XFCE";
 
 mod col {
-    pub const ICON: u32 = 0;
-    pub const NAME: u32 = 1;
-    pub const ENABLED: u32 = 2;
-    pub const REMOVABLE: u32 = 3;
-    pub const TOOLTIP: u32 = 4;
-    pub const RUN_HOOK: u32 = 5;
-    pub const RELPATH: u32 = 6;
+    pub(crate) const ICON: u32 = 0;
+    pub(crate) const NAME: u32 = 1;
+    pub(crate) const ENABLED: u32 = 2;
+    pub(crate) const REMOVABLE: u32 = 3;
+    pub(crate) const TOOLTIP: u32 = 4;
+    pub(crate) const RUN_HOOK: u32 = 5;
+    pub(crate) const RELPATH: u32 = 6;
 }
 
 pub(crate) struct Gui;
@@ -168,12 +168,10 @@ impl Gui {
         edit.connect_clicked(glib::clone!(@weak tree_view => move |_| Self::on_edit_clicked(&tree_view)));
         bbox.pack_start(&edit, false, false, 0);
 
-        selection.connect_changed(glib::clone!(@weak remove, @weak edit => move |_selection| {
-            //TODO: to handle
-            // xfae_window_selection_changed(selection, &remove, &edit);
+        selection.connect_changed(glib::clone!(@weak remove, @weak edit => move |selection| {
+            Self::xfae_window_selection_changed(selection, &remove, &edit);
         }));
-        //TODO: to handle
-        // xfae_window_selection_changed(&selection, &remove, &edit);
+        Self::xfae_window_selection_changed(&selection, &remove, &edit);
 
 
         let v_close_box = Box::builder()
@@ -439,5 +437,29 @@ impl Gui {
         dialog.destroy();
     }
 
+    /// Port of `xfae_window_selection_changed`: Remove asks for an entry every copy
+    /// of which sits in a writable directory, which in practice means one the user
+    /// owns under `~/.config/autostart`.
+    ///
+    /// The C code connects this handler to the Edit button as well, so upstream
+    /// Edit is greyed out on every system wide entry too — the vast majority of the
+    /// list. Here Edit only asks for a selected row: the entry is opened read only
+    /// anyway, and its `Exec` is worth looking at even when the file cannot be
+    /// rewritten in place.
+    fn xfae_window_selection_changed(
+        selection: &gtk::TreeSelection,
+        remove: &gtk::Button,
+        edit: &gtk::Button,
+    ) {
+
+        let selected = selection.selected();
+
+        let removable = selected
+            .as_ref()
+            .is_some_and(|(model, iter)| Self::cell_bool(model, iter, col::REMOVABLE));
+
+        remove.set_sensitive(removable);
+        edit.set_sensitive(selected.is_some());
+    }
 
 }
