@@ -18,10 +18,8 @@
  *
  ***************************************************************************/
 
-pub mod models;
 pub mod niri_check;
 pub mod syslog;
-pub mod xfce;
 
 #[cfg(test)]
 mod test_support;

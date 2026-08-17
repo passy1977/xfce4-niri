@@ -37,7 +37,7 @@ use crate::xfce::ffi::xfce4ui;
 
 
 /// The only group of an autostart `.desktop` file.
-pub const DESKTOP_ENTRY: &CStr = c"Desktop Entry";
+pub(crate) const DESKTOP_ENTRY: &CStr = c"Desktop Entry";
 
 fn glib_bool(value: bool) -> gboolean {
     if value { GTRUE } else { GFALSE }
@@ -53,10 +53,10 @@ mod ffi {
 
         /// `XFCE_RESOURCE_CONFIG` of `XfceResourceType`: `$XDG_CONFIG_HOME` first,
         /// then the `$XDG_CONFIG_DIRS` fallbacks.
-        pub const XFCE_RESOURCE_CONFIG: c_int = 1;
+        pub(crate) const XFCE_RESOURCE_CONFIG: c_int = 1;
 
         #[repr(C)]
-        pub struct XfceRc {
+        pub(crate) struct XfceRc {
             _opaque: [u8; 0],
         }
 
@@ -159,9 +159,9 @@ mod ffi {
             );
         }
 
-        pub const R_OK: c_int = 0x04;
-        pub const W_OK: c_int = 0x02;
-        pub const X_OK: c_int = 0x01;
+        pub(crate) const R_OK: c_int = 0x04;
+        pub(crate) const W_OK: c_int = 0x02;
+        pub(crate) const X_OK: c_int = 0x01;
 
         unsafe extern "C" {
             pub(in crate::xfce) fn access(path: *const c_char, mode: c_int) -> c_int;
@@ -199,7 +199,7 @@ unsafe fn from_strv(strv: *mut *mut c_char) -> Vec<String> {
 
 /// `xfce_resource_match (XFCE_RESOURCE_CONFIG, pattern, unique)`: the
 /// relative paths of every config file matching `pattern`.
-pub fn resource_match(pattern: &str, unique: bool) -> Vec<String> {
+pub(crate) fn resource_match(pattern: &str, unique: bool) -> Vec<String> {
 
     let Ok(pattern) = CString::new(pattern) else {
         return Vec::new()
@@ -216,7 +216,7 @@ pub fn resource_match(pattern: &str, unique: bool) -> Vec<String> {
 
 /// `xfce_resource_lookup_all (XFCE_RESOURCE_CONFIG, rel_path)`: the absolute
 /// path of `rel_path` in every config directory that holds a copy of it.
-pub fn resource_lookup_all(rel_path: &str) -> Vec<String> {
+pub(crate) fn resource_lookup_all(rel_path: &str) -> Vec<String> {
 
     let Ok(rel_path) = CString::new(rel_path) else {
         return Vec::new()
@@ -233,7 +233,7 @@ pub fn resource_lookup_all(rel_path: &str) -> Vec<String> {
 /// `xfce_resource_save_location (XFCE_RESOURCE_CONFIG, rel_path, create)`: the
 /// path under `$XDG_CONFIG_HOME` a new file goes to, its directories made
 /// when `create`.
-pub fn resource_save_location(rel_path: &str, create: bool) -> Option<PathBuf> {
+pub(crate) fn resource_save_location(rel_path: &str, create: bool) -> Option<PathBuf> {
 
     let rel_path = CString::new(rel_path).ok()?;
 
@@ -258,7 +258,7 @@ pub fn resource_save_location(rel_path: &str, create: bool) -> Option<PathBuf> {
 
 /// `access (path, R_OK | W_OK | X_OK)`, the test `xfae_item_is_removable`
 /// runs on the directory holding a `.desktop` file.
-pub fn is_accessible_dir(path: &Path) -> bool {
+pub(crate) fn is_accessible_dir(path: &Path) -> bool {
 
     let Ok(path) = CString::new(path.as_os_str().as_encoded_bytes()) else {
         return false
@@ -268,7 +268,7 @@ pub fn is_accessible_dir(path: &Path) -> bool {
 }
 
 /// `xfce_dialog_show_error (parent, error, "%s", message)`.
-pub fn show_error(parent: Option<&gtk::Window>, error: Option<&glib::Error>, message: &str) {
+pub(crate) fn show_error(parent: Option<&gtk::Window>, error: Option<&glib::Error>, message: &str) {
 
     let parent = parent.map_or(ptr::null_mut(), |it| it.as_ptr());
 
@@ -282,7 +282,7 @@ pub fn show_error(parent: Option<&gtk::Window>, error: Option<&glib::Error>, mes
 }
 
 /// An open `XfceRc`, closed on drop.
-pub struct Rc(*mut xfce4util::XfceRc);
+pub(crate) struct Rc(*mut xfce4util::XfceRc);
 
 impl Rc {
 
@@ -291,7 +291,7 @@ impl Rc {
     ///
     /// Opened for writing, the changes land in the user copy: a system entry
     /// is shadowed rather than edited.
-    pub fn config_open(rel_path: &str, readonly: bool) -> Option<Self> {
+    pub(crate) fn config_open(rel_path: &str, readonly: bool) -> Option<Self> {
 
         let rel_path = CString::new(rel_path).ok()?;
 
@@ -308,7 +308,7 @@ impl Rc {
 
     /// `xfce_rc_simple_open (path, readonly)`, one file and no merging: how a
     /// new `.desktop` file is written, on the [`resource_save_location`] path.
-    pub fn simple_open(path: &Path, readonly: bool) -> Option<Self> {
+    pub(crate) fn simple_open(path: &Path, readonly: bool) -> Option<Self> {
 
         let path = CString::new(path.as_os_str().as_encoded_bytes()).ok()?;
 
@@ -318,23 +318,23 @@ impl Rc {
     }
 
     /// `xfce_rc_set_group (rc, group)`.
-    pub fn set_group(&self, group: &CStr) {
+    pub(crate) fn set_group(&self, group: &CStr) {
         unsafe { xfce4util::xfce_rc_set_group(self.0, group.as_ptr()) };
     }
 
     /// `xfce_rc_is_readonly (rc)`, what every write below refuses on: the
     /// library would answer with a `CRITICAL`.
-    pub fn is_readonly(&self) -> bool {
+    pub(crate) fn is_readonly(&self) -> bool {
         unsafe { xfce4util::xfce_rc_is_readonly(self.0) != GFALSE }
     }
 
     /// `xfce_rc_is_dirty (rc)`: written, not on disk yet.
-    pub fn is_dirty(&self) -> bool {
+    pub(crate) fn is_dirty(&self) -> bool {
         unsafe { xfce4util::xfce_rc_is_dirty(self.0) != GFALSE }
     }
 
     /// `xfce_rc_read_entry (rc, key, NULL)`, copied out of the library.
-    pub fn read_entry(&self, key: &CStr) -> Option<String> {
+    pub(crate) fn read_entry(&self, key: &CStr) -> Option<String> {
 
         let value = unsafe { xfce4util::xfce_rc_read_entry(self.0, key.as_ptr(), ptr::null()) };
 
@@ -343,23 +343,23 @@ impl Rc {
     }
 
     /// `xfce_rc_read_int_entry (rc, key, fallback)`.
-    pub fn read_int_entry(&self, key: &CStr, fallback: i32) -> i32 {
+    pub(crate) fn read_int_entry(&self, key: &CStr, fallback: i32) -> i32 {
         unsafe { xfce4util::xfce_rc_read_int_entry(self.0, key.as_ptr(), fallback) }
     }
 
     /// `xfce_rc_read_bool_entry (rc, key, fallback)`.
-    pub fn read_bool_entry(&self, key: &CStr, fallback: bool) -> bool {
+    pub(crate) fn read_bool_entry(&self, key: &CStr, fallback: bool) -> bool {
         unsafe { xfce4util::xfce_rc_read_bool_entry(self.0, key.as_ptr(), glib_bool(fallback)) != GFALSE }
     }
 
     /// `xfce_rc_read_list_entry (rc, key, ";")`, empty when the key is unset.
-    pub fn read_list_entry(&self, key: &CStr) -> Vec<String> {
+    pub(crate) fn read_list_entry(&self, key: &CStr) -> Vec<String> {
         unsafe { from_strv(xfce4util::xfce_rc_read_list_entry(self.0, key.as_ptr(), c";".as_ptr())) }
     }
 
     /// `xfce_rc_write_entry (rc, key, value)`, `false` on a read only view or
     /// a `NUL` C cannot be handed. In memory until [`flush`](Self::flush).
-    pub fn write_entry(&self, key: &CStr, value: &str) -> bool {
+    pub(crate) fn write_entry(&self, key: &CStr, value: &str) -> bool {
 
         let Ok(value) = CString::new(value) else {
             return false
@@ -375,7 +375,7 @@ impl Rc {
     }
 
     /// `xfce_rc_write_int_entry (rc, key, value)`.
-    pub fn write_int_entry(&self, key: &CStr, value: i32) -> bool {
+    pub(crate) fn write_int_entry(&self, key: &CStr, value: i32) -> bool {
 
         if self.is_readonly() {
             return false
@@ -387,7 +387,7 @@ impl Rc {
     }
 
     /// `xfce_rc_write_bool_entry (rc, key, value)`, the `Hidden` toggle.
-    pub fn write_bool_entry(&self, key: &CStr, value: bool) -> bool {
+    pub(crate) fn write_bool_entry(&self, key: &CStr, value: bool) -> bool {
 
         if self.is_readonly() {
             return false
@@ -401,7 +401,7 @@ impl Rc {
     /// `xfce_rc_write_list_entry (rc, key, values, ";")`, the counterpart of
     /// [`read_list_entry`](Self::read_list_entry). Joined, so without the
     /// trailing `;` the spec makes optional.
-    pub fn write_list_entry<S: AsRef<str>>(&self, key: &CStr, values: &[S]) -> bool {
+    pub(crate) fn write_list_entry<S: AsRef<str>>(&self, key: &CStr, values: &[S]) -> bool {
 
         let Ok(values) = values.iter().map(|it| CString::new(it.as_ref())).collect::<Result<Vec<_>, _>>()
         else {
@@ -425,7 +425,7 @@ impl Rc {
 
     /// `xfce_rc_delete_entry (rc, key, global)`, `global` for every file
     /// behind the view.
-    pub fn delete_entry(&self, key: &CStr, global: bool) -> bool {
+    pub(crate) fn delete_entry(&self, key: &CStr, global: bool) -> bool {
 
         if self.is_readonly() {
             return false
@@ -437,7 +437,7 @@ impl Rc {
     }
 
     /// `xfce_rc_delete_group (rc, group, global)`.
-    pub fn delete_group(&self, group: &CStr, global: bool) -> bool {
+    pub(crate) fn delete_group(&self, group: &CStr, global: bool) -> bool {
 
         if self.is_readonly() {
             return false
@@ -449,13 +449,13 @@ impl Rc {
     }
 
     /// `xfce_rc_flush (rc)`: the pending writes onto disk, view kept open.
-    pub fn flush(&self) {
+    pub(crate) fn flush(&self) {
         unsafe { xfce4util::xfce_rc_flush(self.0) };
     }
 
     /// `xfce_rc_rollback (rc)`: drops the pending writes, so [`Drop`] has
     /// nothing to flush.
-    pub fn rollback(&self) {
+    pub(crate) fn rollback(&self) {
         unsafe { xfce4util::xfce_rc_rollback(self.0) };
     }
 }

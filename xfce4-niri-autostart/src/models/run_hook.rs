@@ -28,7 +28,7 @@
 /// written to the `RunHook` key; the discriminants below are those integers and
 /// [`RunHook::nick`] returns the `value_nick` strings shown in the UI.
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
-pub enum RunHook {
+pub(crate) enum RunHook {
     #[default]
     Login,
     Logout,
@@ -43,7 +43,7 @@ pub enum RunHook {
 impl RunHook {
 
     /// In `GEnumValue` order, the order the combo boxes list them in.
-    pub const ALL: [Self; 7] = [
+    pub(crate) const ALL: [Self; 7] = [
         Self::Login,
         Self::Logout,
         Self::Shutdown,
@@ -56,7 +56,7 @@ impl RunHook {
 
     /// `g_enum_get_value (klass, value)`, falling back to the C default of
     /// `XFSM_RUN_HOOK_LOGIN` for a value no longer in the enum.
-    pub fn from_value(value: i32) -> Self {
+    pub(crate) fn from_value(value: i32) -> Self {
         usize::try_from(value)
             .ok()
             .and_then(|it| Self::ALL.get(it))
@@ -65,12 +65,12 @@ impl RunHook {
     }
 
     /// The position in [`RunHook::ALL`], which is what the `RunHook` key holds.
-    pub fn value(self) -> i32 {
+    pub(crate) fn value(self) -> i32 {
         Self::ALL.iter().position(|it| *it == self).unwrap_or_default() as i32
     }
 
     /// `GEnumValue.value_nick`.
-    pub fn nick(self) -> &'static str {
+    pub(crate) fn nick(self) -> &'static str {
         match self {
             Self::Login => "on login",
             Self::Logout => "on logout",

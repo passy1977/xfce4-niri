@@ -25,23 +25,23 @@ use gtk::gio::{Icon, ThemedIcon};
 use gtk::glib::{Cast, IntoGStr, markup_escape_text};
 use crate::xfce::{DESKTOP_ENTRY, Rc, is_accessible_dir, resource_lookup_all};
 
-use crate::binary_exists;
+use xfce4_niri_lib::binary_exists;
 // use crate::gui::{DEFAULT_ICON, DESKTOP, binary_exists, is_accessible_dir};
 use crate::models::run_hook::RunHook;
 
 
 /// Port of `XfaeItem`: one `autostart/*.desktop` file, as read through
 /// `XfceRc` — so a user file overriding a system one reads as a single entry.
-pub struct Item {
-    pub name: String,
-    pub icon: Icon,
-    pub comment: String,
-    pub rel_path: String,
-    pub hidden: bool,
-    pub tooltip: String,
-    pub run_hook: RunHook,
-    pub show_in_xfce: bool,
-    pub show_in_override: bool
+pub(crate) struct Item {
+    pub(crate) name: String,
+    pub(crate) icon: Icon,
+    pub(crate) comment: String,
+    pub(crate) rel_path: String,
+    pub(crate) hidden: bool,
+    pub(crate) tooltip: String,
+    pub(crate) run_hook: RunHook,
+    pub(crate) show_in_xfce: bool,
+    pub(crate) show_in_override: bool
 }
 
 impl Item {
@@ -49,7 +49,7 @@ impl Item {
     /// Port of `xfae_item_new`: `None` for anything the C code skips, i.e. a
     /// non `Application` entry, one hidden from this desktop by `NotShowIn`,
     /// or one whose `TryExec` binary is missing.
-    pub fn new(rel_path: &str, desktop: &str, default_icon: &str) -> Option<Self> {
+    pub(crate) fn new(rel_path: &str, desktop: &str, default_icon: &str) -> Option<Self> {
 
         let rc = Rc::config_open(rel_path, true)?;
         rc.set_group(DESKTOP_ENTRY);
@@ -92,7 +92,7 @@ impl Item {
 
     /// Port of `xfae_item_is_enabled`: an entry not meant for this desktop
     /// needs the `X-XFCE-Autostart-Override` opt in on top of not being hidden.
-    pub fn is_enabled(&self) -> bool {
+    pub(crate) fn is_enabled(&self) -> bool {
         if self.show_in_xfce {
             !self.hidden
         } else {
@@ -102,7 +102,7 @@ impl Item {
 
     /// Port of `xfae_item_is_removable`: removable only while every directory
     /// holding a copy of the file can be written to.
-    pub fn is_removable(&self) -> bool {
+    pub(crate) fn is_removable(&self) -> bool {
         resource_lookup_all(&self.rel_path)
             .iter()
             .all(|file| Path::new(file).parent().is_some_and(is_accessible_dir))
@@ -110,7 +110,7 @@ impl Item {
 
     /// The markup `xfae_model_get_value` builds for `XFAE_MODEL_COLUMN_NAME`:
     /// "name (comment)", in italics when the entry is not shown on this desktop.
-    pub fn markup(&self) -> String {
+    pub(crate) fn markup(&self) -> String {
 
         let name = markup_escape_text(&self.name);
 
@@ -125,7 +125,7 @@ impl Item {
 
     /// Port of `xfae_item_sort_default`: entries for this desktop first, then
     /// by name.
-    pub fn sort_default(a: &Self, b: &Self) -> Ordering {
+    pub(crate) fn sort_default(a: &Self, b: &Self) -> Ordering {
         match (a.show_in_xfce, b.show_in_xfce) {
             (true, false) => Ordering::Less,
             (false, true) => Ordering::Greater,

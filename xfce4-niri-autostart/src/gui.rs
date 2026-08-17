@@ -30,9 +30,9 @@ use gtk::traits::{BoxExt, ButtonExt, CellRendererComboExt, CellRendererToggleExt
 use gtk::prelude::{GtkListStoreExtManual, GtkListStoreExt, TreeViewColumnExt as Column};
 
 use osal_rs::os::{Mutex, MutexFn};
-use xfce4_niri_lib::xfce::{self, resource_match};
-use xfce4_niri_lib::models::item::Item;
-use xfce4_niri_lib::models::run_hook::RunHook;
+use crate::xfce::{self, resource_match};
+use crate::models::item::Item;
+use crate::models::run_hook::RunHook;
 
 use crate::gui::dialog::Dialog;
 
