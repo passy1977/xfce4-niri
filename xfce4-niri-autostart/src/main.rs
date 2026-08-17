@@ -27,8 +27,10 @@ mod gui;
 mod models;
 mod xfce;
 
+use std::cell::RefCell;
 use std::error::Error;
 use std::ffi::c_int;
+use std::rc::Rc;
 
 use gtk::Application;
 use gtk::gio::prelude::ApplicationExtManual;
@@ -79,6 +81,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn build_ui(app: &gtk::Application) {
+
+    // The signal handlers only hold a weak reference to the `Gui`, so the strong
+    // one has to live as long as the window does.
+    thread_local! {
+        static GUI: RefCell<Option<Rc<Gui>>> = const { RefCell::new(None) };
+    }
+
     let window = Mutex::new_arc(
         gtk::ApplicationWindow::builder()
         .application(app)
@@ -88,12 +97,18 @@ fn build_ui(app: &gtk::Application) {
         .build()
     );
 
-    let window_clone = window.clone();    
-    let window = window.lock().expect("Failed to lock window mutex");
-    window.add(&Gui::window_new(
+
+    let window_clone = window.clone();
+    let (gui, gtk_box) = Gui::window_new(
         window_clone.clone(), 
         Mutex::new_arc(on_item_toggled),
     Mutex::new_arc(on_right_click)
-    ));
+    );
+    
+    GUI.with_borrow_mut(|it| *it = Some(gui));
+
+
+    let window = window.lock().expect("Failed to lock window mutex");
+    window.add(&gtk_box);
     window.show_all();
 }

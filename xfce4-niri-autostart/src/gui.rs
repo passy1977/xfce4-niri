@@ -20,14 +20,15 @@
 
 mod dialog;
 
+use std::rc::Rc;
 use std::sync::Arc;
 
-use gtk::gio::Icon;
+use gtk::gio::{Icon, ThemedIcon};
 use gtk::gdk;
 use gtk::{ApplicationWindow, Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ScrolledWindow, SelectionMode, ShadowType, TreePath, TreeView, TreeViewColumn, Box};
 use gtk::glib::{self, Cast, IsA, Propagation, StaticType, ToValue};
 use gtk::traits::{BoxExt, ButtonExt, CellRendererComboExt, CellRendererToggleExt, ContainerExt, GtkMenuExt, GtkMenuItemExt, GtkWindowExt, MenuShellExt, StyleContextExt, TreeModelExt, TreeSelectionExt, TreeViewColumnExt, TreeViewExt, WidgetExt};
-use gtk::prelude::{GtkListStoreExtManual, GtkListStoreExt, TreeViewColumnExt as Column};
+use gtk::prelude::{GtkListStoreExt, GtkListStoreExtManual, TreeSortableExtManual, TreeViewColumnExt as Column};
 
 use osal_rs::os::{Mutex, MutexFn};
 use crate::xfce::{self, resource_match};
@@ -53,7 +54,9 @@ mod col {
     pub(crate) const RELPATH: u32 = 6;
 }
 
-pub(crate) struct Gui;
+pub(crate) struct Gui {
+    tree_view: TreeView
+}
 
 impl Gui {
 
@@ -71,10 +74,10 @@ impl Gui {
         widget.toplevel().and_then(|it| it.downcast::<gtk::Window>().ok())
     }
 
-    pub(crate) fn window_new(window: Arc<Mutex<ApplicationWindow>>, 
+    pub(crate) fn window_new(window: Arc<Mutex<ApplicationWindow>>,
         _on_item_toggled: Arc<Mutex<fn(&ListStore, &TreePath) -> ()>>,
         _on_right_click: Arc<Mutex<fn(&TreeView, &gdk::EventButton) -> Propagation>>
-    ) -> Box {
+    ) -> (Rc<Self>, Box) {
 
         let vbox = Box::builder()
             .orientation(Orientation::Vertical)
@@ -89,7 +92,7 @@ impl Gui {
             .build();
         vbox.pack_start(&swin, true, true, 0);
 
-        let model = Self::new_tree_view_model();
+        let model = Self::tree_view_model_new();
 
         let tree_view = gtk::TreeView::builder()
             .model(&model)
@@ -98,9 +101,17 @@ impl Gui {
             .build();
         swin.add(&tree_view);
 
-        // let on_right_click_cb = on_right_click.clone();
-        // tree_view.connect_button_press_event(*on_right_click_cb.lock().expect("Failed to lock on_right_click_cb mutex"));
-        tree_view.connect_button_press_event(Self::on_mouse_right_click);
+        // Every handler that needs the `Gui` gets it through this handle: the
+        // closures GTK owns hold a weak reference, so the tree view keeping them
+        // alive does not keep `Gui` alive in turn.
+        let this = Rc::new(Self {
+            tree_view: tree_view.clone()
+        });
+
+        tree_view.connect_button_press_event(glib::clone!(
+            @weak this => @default-return Propagation::Proceed,
+            move |tree_view, event| this.on_mouse_right_click(tree_view, event)
+        ));
         tree_view.connect_realize(|tree_view| tree_view.columns_autosize());
 
         let selection = tree_view.selection();
@@ -146,7 +157,7 @@ impl Gui {
             .build();
         let renderer = CellRendererCombo::builder()
             .has_entry(false)
-            .model(&Self::new_combo_model())
+            .model(&Self::combo_model_new())
             .text_column(0)
             .editable(true)
             .mode(CellRendererMode::Editable)
@@ -172,15 +183,15 @@ impl Gui {
         };
 
         let add = button("Add", "list-add-symbolic", "Add application");
-        add.connect_clicked(glib::clone!(@weak tree_view => move |_| Self::on_button_add_clicked(&tree_view)));
+        add.connect_clicked(glib::clone!(@weak this => move |_| this.on_button_add_clicked()));
         bbox.pack_start(&add, false, false, 0);
 
         let remove = button("Remove", "list-remove-symbolic", "Remove application");
-        remove.connect_clicked(glib::clone!(@weak tree_view => move |_| Self::on_button_remove_clicked(&tree_view)));
+        remove.connect_clicked(glib::clone!(@weak this => move |_| this.on_button_remove_clicked()));
         bbox.pack_start(&remove, false, false, 0);
 
         let edit = button("Edit", "document-edit-symbolic", "Edit application");
-        edit.connect_clicked(glib::clone!(@weak tree_view => move |_| Self::on_button_edit_clicked(&tree_view)));
+        edit.connect_clicked(glib::clone!(@weak this => move |_| this.on_button_edit_clicked()));
         bbox.pack_start(&edit, false, false, 0);
 
         selection.connect_changed(glib::clone!(@weak remove, @weak edit => move |selection| {
@@ -204,11 +215,11 @@ impl Gui {
         vbox.pack_start(&v_close_box, false, false, 0);
         
 
-        vbox
+        (this, vbox)
 
     }
 
-    fn new_combo_model() -> gtk::ListStore {
+    fn combo_model_new() -> gtk::ListStore {
 
         let model = gtk::ListStore::new(&[String::static_type()]);
 
@@ -221,12 +232,12 @@ impl Gui {
 
     /// Port of `xfae_model_get`: reads back the entry behind a row, which is what
     /// the edit dialog is filled with.
-    fn tree_view_model_get(relpath: &str) -> Result<(String, String, String, RunHook), glib::Error> {
+    fn tree_view_model_get(rel_path: &str) -> Result<(String, String, String, RunHook), glib::Error> {
 
-        let Some(rc) = xfce::Rc::config_open(relpath, true) else {
+        let Some(rc) = xfce::Rc::config_open(rel_path, true) else {
             return Err(glib::Error::new(
                 glib::FileError::Io,
-                &format!("Failed to open {relpath} for reading"),
+                &format!("Failed to open {rel_path} for reading"),
             ))
         };
 
@@ -241,7 +252,7 @@ impl Gui {
     }
 
 
-    fn new_tree_view_model() -> ListStore {
+    fn tree_view_model_new() -> ListStore {
 
         let model = ListStore::new(&[
             Icon::static_type(),        // ICON
@@ -275,6 +286,32 @@ impl Gui {
         model
     }
 
+    fn tree_view_model_add(&self, name: String, descr: String, command: String, run_hook: RunHook) -> ListStore {
+
+        let model = self.tree_view
+            .model().expect("")
+            .downcast::<ListStore>()
+            .ok().expect("");
+
+        let icon = ThemedIcon::with_default_fallbacks(DEFAULT_ICON).upcast::<Icon>();
+        model.set(&model.append(), &[
+            (col::ICON, &icon as &dyn ToValue),
+            (col::NAME, &name),
+            (col::ENABLED, &true),
+            (col::REMOVABLE, &true),
+            (col::TOOLTIP, &descr),
+            (col::RUN_HOOK, &run_hook.nick()),
+            (col::RELPATH, &command),
+        ]);
+
+
+        model.set_sort_column_id(gtk::SortColumn::Index(1), gtk::SortType::Ascending);
+
+        self.tree_view.set_model(Some(&model));
+
+        model
+    }
+
     fn on_tree_cell_item_toggled(
         model: &gtk::ListStore, 
         path: &gtk::TreePath
@@ -289,22 +326,23 @@ impl Gui {
     }
 
 
-    fn on_menu_add_clicked(tree_view: &gtk::TreeView) {
+    fn on_menu_add_clicked(&self) {
 
-        let parent = Self::toplevel(tree_view);
+        let parent = Self::toplevel(&self.tree_view);
         let dialog = Dialog::new(parent.as_ref(), None, None, None, RunHook::Login);
 
         if dialog.run() == gtk::ResponseType::Ok {
             dialog.hide();
-            let (_name, _descr, _command, _run_hook) = dialog.get();
+            let (name, descr, command, run_hook) = dialog.get();
+            self.tree_view_model_add(name, descr, command, run_hook);
         }
 
         dialog.destroy();
     }
 
-    fn on_menu_remove_clicked(tree_view: &gtk::TreeView) {
+    fn on_menu_remove_clicked(&self) {
 
-        let Some((model, iter)) = tree_view.selection().selected() else {
+        let Some((model, iter)) = self.tree_view.selection().selected() else {
             return
         };
 
@@ -317,6 +355,7 @@ impl Gui {
 
 
     fn on_mouse_right_click(
+        self: &Rc<Self>,
         tree_view: &gtk::TreeView,
         event: &gtk::gdk::EventButton,
     ) -> glib::Propagation {
@@ -340,11 +379,11 @@ impl Gui {
         let menu = gtk::Menu::new();
 
         let add = gtk::MenuItem::with_label("Add");
-        add.connect_activate(glib::clone!(@weak tree_view => move |_| Self::on_menu_add_clicked(&tree_view)));
+        add.connect_activate(glib::clone!(@weak self as this => move |_| this.on_menu_add_clicked()));
         menu.append(&add);
 
         let remove = gtk::MenuItem::with_label("Remove");
-        remove.connect_activate(glib::clone!(@weak tree_view => move |_| Self::on_menu_remove_clicked(&tree_view)));
+        remove.connect_activate(glib::clone!(@weak self as this => move |_| this.on_menu_remove_clicked()));
         remove.set_sensitive(removable);
         menu.append(&remove);
 
@@ -377,9 +416,9 @@ impl Gui {
         model.set_value(&iter, col::RUN_HOOK, &nick.to_value());
     }
 
-    fn on_button_add_clicked(tree_view: &gtk::TreeView) {
+    fn on_button_add_clicked(&self) {
 
-        let parent = Self::toplevel(tree_view);
+        let parent = Self::toplevel(&self.tree_view);
         let dialog = Dialog::new(parent.as_ref(), None, None, None, RunHook::Login);
 
         if dialog.run() == gtk::ResponseType::Ok {
@@ -390,9 +429,9 @@ impl Gui {
         dialog.destroy();
     }
 
-    fn on_button_remove_clicked(tree_view: &gtk::TreeView) {
+    fn on_button_remove_clicked(&self) {
 
-        let Some((model, iter)) = tree_view.selection().selected() else {
+        let Some((model, iter)) = self.tree_view.selection().selected() else {
             return
         };
 
@@ -403,11 +442,11 @@ impl Gui {
         model.remove(&iter);
     }
 
-    fn on_button_edit_clicked(tree_view: &gtk::TreeView) {
+    fn on_button_edit_clicked(&self) {
 
-        let parent = Self::toplevel(tree_view);
+        let parent = Self::toplevel(&self.tree_view);
 
-        let Some((model, iter)) = tree_view.selection().selected() else {
+        let Some((model, iter)) = self.tree_view.selection().selected() else {
             return
         };
 
