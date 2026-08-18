@@ -305,9 +305,8 @@ impl Gui {
         ]);
 
 
-        model.set_sort_column_id(gtk::SortColumn::Index(1), gtk::SortType::Ascending);
-
         self.tree_view.set_model(Some(&model));
+        model.set_sort_column_id(gtk::SortColumn::Index(1), gtk::SortType::Ascending);
 
         model
     }
