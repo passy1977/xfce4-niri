@@ -24,8 +24,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use gtk::gio::{Icon, ThemedIcon};
-use gtk::gdk;
-use gtk::{ApplicationWindow, Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ScrolledWindow, SelectionMode, ShadowType, TreePath, TreeView, TreeViewColumn, Box};
+use gtk::{ApplicationWindow, Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ScrolledWindow, SelectionMode, ShadowType, TreeView, TreeViewColumn, Box};
 use gtk::glib::{self, Cast, IsA, Propagation, StaticType, ToValue};
 use gtk::traits::{BoxExt, ButtonExt, CellRendererComboExt, CellRendererToggleExt, ContainerExt, GtkMenuExt, GtkMenuItemExt, GtkWindowExt, MenuShellExt, StyleContextExt, TreeModelExt, TreeSelectionExt, TreeViewColumnExt, TreeViewExt, WidgetExt};
 use gtk::prelude::{GtkListStoreExt, GtkListStoreExtManual, TreeSortableExtManual, TreeViewColumnExt as Column};
@@ -74,10 +73,7 @@ impl Gui {
         widget.toplevel().and_then(|it| it.downcast::<gtk::Window>().ok())
     }
 
-    pub(crate) fn window_new(window: Arc<Mutex<ApplicationWindow>>,
-        _on_item_toggled: Arc<Mutex<fn(&ListStore, &TreePath) -> ()>>,
-        _on_right_click: Arc<Mutex<fn(&TreeView, &gdk::EventButton) -> Propagation>>
-    ) -> (Rc<Self>, Box) {
+    pub(crate) fn window_new(window: Arc<Mutex<ApplicationWindow>>) -> (Rc<Self>, Box) {
 
         let vbox = Box::builder()
             .orientation(Orientation::Vertical)

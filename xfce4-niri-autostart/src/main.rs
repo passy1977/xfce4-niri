@@ -42,7 +42,6 @@ use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 use crate::data::Data;
 use crate::gui::Gui;
-use crate::gui_controller::{on_item_toggled, on_right_click};
 
 const APP_ID: &str = "it.salsi.xfce-niri.AutoStart";
 
@@ -99,11 +98,7 @@ fn build_ui(app: &gtk::Application) {
 
 
     let window_clone = window.clone();
-    let (gui, gtk_box) = Gui::window_new(
-        window_clone.clone(), 
-        Mutex::new_arc(on_item_toggled),
-    Mutex::new_arc(on_right_click)
-    );
+    let (gui, gtk_box) = Gui::window_new(window_clone.clone());
     
     GUI.with_borrow_mut(|it| *it = Some(gui));
 
