@@ -29,19 +29,8 @@ use std::fs::{self, File, Permissions};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Mutex, MutexGuard, Once};
+use std::sync::{Mutex, MutexGuard};
 use std::{env, process};
-
-/// libxfce4util builds its resource directory list on the first call, without
-/// a lock: two tests getting there at once see a half built one. Every test
-/// touching `XFCE_RESOURCE_CONFIG` calls this first, so that init runs alone;
-/// the reads after it are safe from any number of threads.
-pub fn xfce_resource_ready() {
-    static ONCE: Once = Once::new();
-    ONCE.call_once(|| {
-        crate::xfce::resource_save_location("xfce4-niri-resource-warm-up", false);
-    });
-}
 
 /// The lock every [`EnvGuard`] holds, so two tests never see each other's
 /// environment. Poisoning is ignored: a panicking test leaves the environment
