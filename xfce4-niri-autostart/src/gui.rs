@@ -106,7 +106,7 @@ impl Gui {
 
         tree_view.connect_button_press_event(glib::clone!(
             @weak this => @default-return Propagation::Proceed,
-            move |tree_view, event| this.on_mouse_right_click(tree_view, event)
+            move |tree_view, event| this.on_mouse_right_clicked(tree_view, event)
         ));
         tree_view.connect_realize(|tree_view| tree_view.columns_autosize());
 
@@ -349,7 +349,7 @@ impl Gui {
     }
 
 
-    fn on_mouse_right_click(
+    fn on_mouse_right_clicked(
         self: &Rc<Self>,
         tree_view: &gtk::TreeView,
         event: &gtk::gdk::EventButton,
