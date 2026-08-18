@@ -39,7 +39,7 @@ use crate::data::Data;
 use crate::dbus::DBus;
 use crate::brightness::Brightness;
 use crate::lock_screen::LockScreen;
-use xfce4_niri_lib::niri_check::NiriCheck;
+use xfce4_niri_lib::niri::Niri;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 
@@ -56,7 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
-    let version = match NiriCheck::version() {
+    let version = match Niri::version() {
         Some(version) => version,
         None => {
             let msg = "Niri not ruining";

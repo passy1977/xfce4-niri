@@ -24,9 +24,9 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::time::Duration;
 
-pub struct NiriCheck;
+pub struct Niri;
 
-impl NiriCheck {
+impl Niri {
 
     const TIMEOUT: Duration = Duration::from_millis(500);
 
@@ -138,7 +138,7 @@ mod tests {
             .set("XDG_RUNTIME_DIR", "/run/user/1000")
             .unset("WAYLAND_DISPLAY");
 
-        assert_eq!(NiriCheck::socket_path(), Some(PathBuf::from("/run/user/1000/niri.chosen.sock")));
+        assert_eq!(Niri::socket_path(), Some(PathBuf::from("/run/user/1000/niri.chosen.sock")));
     }
 
     #[test]
@@ -147,8 +147,8 @@ mod tests {
         let mut env = EnvGuard::new();
         env.set("NIRI_SOCKET", "").unset("XDG_RUNTIME_DIR");
 
-        assert_eq!(NiriCheck::socket_path(), None);
-        assert!(NiriCheck::version().is_none());
+        assert_eq!(Niri::socket_path(), None);
+        assert!(Niri::version().is_none());
     }
 
     #[test]
@@ -161,7 +161,7 @@ mod tests {
         let mut env = EnvGuard::new();
         env.unset("NIRI_SOCKET").set("XDG_RUNTIME_DIR", dir.path()).unset("WAYLAND_DISPLAY");
 
-        assert_eq!(NiriCheck::socket_path(), None);
+        assert_eq!(Niri::socket_path(), None);
     }
 
     /// With a display set only its own sockets are candidates, and the last one
@@ -178,11 +178,11 @@ mod tests {
         let mut env = EnvGuard::new();
         env.unset("NIRI_SOCKET").set("XDG_RUNTIME_DIR", dir.path()).set("WAYLAND_DISPLAY", "wayland-1");
 
-        assert_eq!(NiriCheck::socket_path(), Some(dir.path().join("niri.wayland-1.9.sock")));
+        assert_eq!(Niri::socket_path(), Some(dir.path().join("niri.wayland-1.9.sock")));
 
         // No display: every `niri.*.sock` is a candidate.
         env.unset("WAYLAND_DISPLAY");
-        assert_eq!(NiriCheck::socket_path(), Some(dir.path().join("niri.wayland-2.5.sock")));
+        assert_eq!(Niri::socket_path(), Some(dir.path().join("niri.wayland-2.5.sock")));
     }
 
     #[test]
@@ -195,7 +195,7 @@ mod tests {
         let mut env = EnvGuard::new();
         env.set("NIRI_SOCKET", &socket);
 
-        assert_eq!(NiriCheck::request("\"ping\"").unwrap(), "{\"Ok\":\"pong\"}\n");
+        assert_eq!(Niri::request("\"ping\"").unwrap(), "{\"Ok\":\"pong\"}\n");
         assert_eq!(server.join().unwrap(), "\"ping\"\n");
     }
 
@@ -207,7 +207,7 @@ mod tests {
         let mut env = EnvGuard::new();
         env.set("NIRI_SOCKET", dir.path().join("niri.sock"));
 
-        assert!(NiriCheck::request("\"Version\"").is_err(), "nothing is listening");
+        assert!(Niri::request("\"Version\"").is_err(), "nothing is listening");
     }
 
     #[test]
@@ -220,7 +220,7 @@ mod tests {
         let mut env = EnvGuard::new();
         env.set("NIRI_SOCKET", &socket);
 
-        assert_eq!(NiriCheck::version().as_deref(), Some("25.05.1"));
+        assert_eq!(Niri::version().as_deref(), Some("25.05.1"));
         assert_eq!(server.join().unwrap(), "\"Version\"\n");
     }
 
@@ -234,7 +234,7 @@ mod tests {
         let mut env = EnvGuard::new();
         env.set("NIRI_SOCKET", &socket);
 
-        assert_eq!(NiriCheck::version(), None);
+        assert_eq!(Niri::version(), None);
 
         server.join().unwrap();
     }

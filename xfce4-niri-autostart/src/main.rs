@@ -37,7 +37,7 @@ use gtk::gio::prelude::ApplicationExtManual;
 use gtk::gio::traits::ApplicationExt;
 use gtk::traits::{WidgetExt, ContainerExt};
 use osal_rs::os::{Mutex, MutexFn};
-use xfce4_niri_lib::niri_check::NiriCheck;
+use xfce4_niri_lib::niri::Niri;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 use crate::data::Data;
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
 
-    let version = match NiriCheck::version() {
+    let version = match Niri::version() {
         Some(version) => version,
         None => {
             let msg = "Niri not ruining";
