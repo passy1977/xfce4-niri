@@ -206,7 +206,7 @@ impl Gui {
         close.connect_clicked(move |_| {
             window.lock().unwrap().close();
         });
-        close.set_margin_top(12);
+        // close.set_margin_top(12);
         v_close_box.pack_end(&close, false, false, 0);
         vbox.pack_start(&v_close_box, false, false, 0);
         
