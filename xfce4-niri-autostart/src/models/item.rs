@@ -19,11 +19,12 @@
  ***************************************************************************/
 
 use std::cmp::Ordering;
-use std::path::Path;
+use std::ffi::CStr;
+use std::path::{Path, PathBuf};
 
 use gtk::gio::{Icon, ThemedIcon};
-use gtk::glib::{Cast, IntoGStr, markup_escape_text};
-use crate::xfce::{DESKTOP_ENTRY, Rc, is_accessible_dir, resource_lookup_all};
+use gtk::glib::{self, Cast, Error, FileError, IntoGStr, markup_escape_text};
+use crate::xfce::{Rc, is_accessible_dir, resource_lookup_all, resource_save_location};
 
 use xfce4_niri_lib::binary_exists;
 // use crate::gui::{DEFAULT_ICON, DESKTOP, binary_exists, is_accessible_dir};
@@ -45,6 +46,8 @@ pub(crate) struct Item {
 }
 
 impl Item {
+    /// The only group of an autostart `.desktop` file.
+    pub(crate) const DESKTOP_ENTRY: &CStr = c"Desktop Entry";
 
     /// Port of `xfae_item_new`: `None` for anything the C code skips, i.e. a
     /// non `Application` entry, one hidden from this desktop by `NotShowIn`,
@@ -52,7 +55,7 @@ impl Item {
     pub(crate) fn new(rel_path: &str, desktop: &str, default_icon: &str) -> Option<Self> {
 
         let rc = Rc::config_open(rel_path, true)?;
-        rc.set_group(DESKTOP_ENTRY);
+        rc.set_group(Self::DESKTOP_ENTRY);
 
         if !rc.read_entry(c"Type").is_some_and(|it| it.eq_ignore_ascii_case("Application")) {
             return None
@@ -88,6 +91,102 @@ impl Item {
         }
 
         Some(item)
+    }
+
+    
+    /// Port of `xfae_model_get`: reads back the entry behind a row, which is what
+    /// the edit dialog is filled with.
+    pub(crate) fn get(rel_path: &str) -> Result<(String, String, String, RunHook), Error> {
+
+        let Some(rc) = Rc::config_open(rel_path, true) else {
+            return Err(Error::new(
+                glib::FileError::Io,
+                &format!("Failed to open {rel_path} for reading"),
+            ))
+        };
+
+        rc.set_group(Self::DESKTOP_ENTRY);
+
+        Ok((
+            rc.read_entry(c"Name").unwrap_or_default(),
+            rc.read_entry(c"Comment").unwrap_or_default(),
+            rc.read_entry(c"Exec").unwrap_or_default(),
+            RunHook::from_value(rc.read_int_entry(c"RunHook", RunHook::Login.value())),
+        ))
+    }
+
+    pub(crate) fn free_rel_path(name: &str) -> Result<(String, PathBuf), glib::Error> {
+
+        let name = name.replace('/', "-");
+
+        let mut n = 0;
+
+        loop {
+
+            let rel_path = if n == 0 {
+                format!("autostart/{name}.desktop")
+            } else {
+                format!("autostart/{name}-{n}.desktop")
+            };
+
+            if resource_lookup_all(&rel_path).is_empty() {
+
+                // `create`: `~/.config/autostart` può non esistere ancora.
+                let path = resource_save_location(&rel_path, true).ok_or_else(|| {
+                    glib::Error::new(
+                        glib::FileError::Io,
+                        &format!("Failed to find a save location for {rel_path}"),
+                    )
+                })?;
+
+                return Ok((rel_path, path))
+            }
+
+            n += 1;
+        }
+    }
+
+    pub(crate) fn write_desktop_file(
+        path: &Path,
+        name: &str,
+        comment: &str,
+        exec: &str,
+        run_hook: RunHook,
+    ) -> Result<(), Error> {
+
+        let Some(rc) = Rc::simple_open(path, false) else {
+            return Err(Error::new(
+                glib::FileError::Io,
+                &format!("Failed to open {} for writing", path.display()),
+            ))
+        };
+
+        rc.set_group(Self::DESKTOP_ENTRY);
+
+        let written = rc.write_entry(c"Encoding", "UTF-8")
+            && rc.write_entry(c"Version", "0.9.4")
+            && rc.write_entry(c"Type", "Application")
+            && rc.write_entry(c"Name", name)
+            && rc.write_entry(c"Comment", comment)
+            && rc.write_entry(c"Exec", exec)
+            && rc.write_bool_entry(c"StartupNotify", false)
+            && rc.write_bool_entry(c"Terminal", false)
+            && rc.write_bool_entry(c"Hidden", false)
+            && rc.write_int_entry(c"RunHook", run_hook.value());
+
+        if !written {
+            rc.rollback();
+
+            return Err(Error::new(
+                FileError::Inval,
+                &format!("Failed to write {}", path.display()),
+            ))
+        }
+
+        // `Drop` flusherebbe comunque, così però un errore resta visibile qui.
+        rc.flush();
+
+        Ok(())
     }
 
     /// Port of `xfae_item_is_enabled`: an entry not meant for this desktop

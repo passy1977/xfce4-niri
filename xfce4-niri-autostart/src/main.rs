@@ -22,10 +22,12 @@ extern crate osal_rs;
 extern crate xfce4_niri_lib;
 
 mod data;
-mod gui_controller;
 mod gui;
 mod models;
 mod xfce;
+
+#[cfg(test)]
+mod test_support;
 
 use std::cell::RefCell;
 use std::error::Error;

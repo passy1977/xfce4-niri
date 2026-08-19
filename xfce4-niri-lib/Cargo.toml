@@ -12,5 +12,10 @@ documentation = "https://docs.rs/xfce4-niri"
 readme = "../README.md"
 keywords = ["niri", "xfce4", "embedded", "posix"]
 
+[features]
+# The unit test helpers, so the other crates of the workspace can use them
+# too. Only ever switched on by a dev-dependency: off in a normal build.
+test-support = []
+
 [dependencies]
 gtk = { version = "0.18", features = ["v3_24"] }

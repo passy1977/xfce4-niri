@@ -35,10 +35,6 @@ use gtk::prelude::*;
 use crate::xfce::ffi::xfce4util;
 use crate::xfce::ffi::xfce4ui;
 
-
-/// The only group of an autostart `.desktop` file.
-pub(crate) const DESKTOP_ENTRY: &CStr = c"Desktop Entry";
-
 fn glib_bool(value: bool) -> gboolean {
     if value { GTRUE } else { GFALSE }
 }
@@ -475,7 +471,7 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::test_support::{TempDir, xfce_resource_ready};
+    use crate::{models::item::Item, test_support::{TempDir, xfce_resource_ready}};
 
     #[test]
     fn glib_bool_maps_onto_the_c_constants() {
@@ -534,7 +530,7 @@ mod tests {
         let rc = Rc::config_open("autostart/xfce4-niri-no-such-entry.desktop", true)
             .expect("an empty view, not a failure");
 
-        rc.set_group(DESKTOP_ENTRY);
+        rc.set_group(Item::Item::DESKTOP_ENTRY);
 
         assert_eq!(rc.read_entry(c"Type"), None);
         assert_eq!(rc.read_int_entry(c"RunHook", 42), 42);
@@ -553,7 +549,7 @@ mod tests {
 
         {
             let rc = Rc::simple_open(&path, false).expect("a writable view");
-            rc.set_group(DESKTOP_ENTRY);
+            rc.set_group(Item::DESKTOP_ENTRY);
 
             assert!(!rc.is_readonly());
 
@@ -569,7 +565,7 @@ mod tests {
         }
 
         let rc = Rc::simple_open(&path, true).expect("the file just written");
-        rc.set_group(DESKTOP_ENTRY);
+        rc.set_group(Item::DESKTOP_ENTRY);
 
         assert_eq!(rc.read_entry(c"Type").as_deref(), Some("Application"));
         assert_eq!(rc.read_entry(c"Name").as_deref(), Some("Niri"));
@@ -587,7 +583,7 @@ mod tests {
 
         {
             let rc = Rc::simple_open(&path, false).expect("a writable view");
-            rc.set_group(DESKTOP_ENTRY);
+            rc.set_group(Item::DESKTOP_ENTRY);
 
             rc.write_entry(c"Type", "Application");
             rc.write_bool_entry(c"Hidden", false);
@@ -616,7 +612,7 @@ mod tests {
 
         {
             let rc = Rc::simple_open(&path, false).expect("a writable view");
-            rc.set_group(DESKTOP_ENTRY);
+            rc.set_group(Item::DESKTOP_ENTRY);
 
             rc.write_entry(c"Type", "Application");
             rc.write_entry(c"Name", "Niri");
@@ -626,7 +622,7 @@ mod tests {
 
         {
             let rc = Rc::simple_open(&path, true).expect("the file just written");
-            rc.set_group(DESKTOP_ENTRY);
+            rc.set_group(Item::DESKTOP_ENTRY);
 
             assert_eq!(rc.read_entry(c"Type").as_deref(), Some("Application"));
             assert_eq!(rc.read_entry(c"Name"), None);
@@ -634,11 +630,11 @@ mod tests {
 
         {
             let rc = Rc::simple_open(&path, false).expect("a writable view");
-            assert!(rc.delete_group(DESKTOP_ENTRY, true));
+            assert!(rc.delete_group(Item::DESKTOP_ENTRY, true));
         }
 
         let rc = Rc::simple_open(&path, true).expect("the file just written");
-        rc.set_group(DESKTOP_ENTRY);
+        rc.set_group(Item::DESKTOP_ENTRY);
 
         assert_eq!(rc.read_entry(c"Type"), None);
     }
@@ -651,7 +647,7 @@ mod tests {
         let path = dir.path().join("rolled-back.desktop");
 
         let rc = Rc::simple_open(&path, false).expect("a writable view");
-        rc.set_group(DESKTOP_ENTRY);
+        rc.set_group(Item::DESKTOP_ENTRY);
 
         rc.write_entry(c"Type", "Application");
         assert!(rc.is_dirty());
@@ -672,12 +668,12 @@ mod tests {
 
         {
             let rc = Rc::simple_open(&path, false).expect("a writable view");
-            rc.set_group(DESKTOP_ENTRY);
+            rc.set_group(Item::DESKTOP_ENTRY);
             rc.write_entry(c"Type", "Application");
         }
 
         let rc = Rc::simple_open(&path, true).expect("the file just written");
-        rc.set_group(DESKTOP_ENTRY);
+        rc.set_group(Item::DESKTOP_ENTRY);
 
         assert!(rc.is_readonly());
 
@@ -686,7 +682,7 @@ mod tests {
         assert!(!rc.write_bool_entry(c"Hidden", true));
         assert!(!rc.write_list_entry(c"OnlyShowIn", &["XFCE"]));
         assert!(!rc.delete_entry(c"Type", true));
-        assert!(!rc.delete_group(DESKTOP_ENTRY, true));
+        assert!(!rc.delete_group(Item::DESKTOP_ENTRY, true));
 
         assert!(!rc.is_dirty());
         assert_eq!(rc.read_entry(c"Type").as_deref(), Some("Application"));
@@ -700,7 +696,7 @@ mod tests {
         let path = dir.path().join("nul.desktop");
 
         let rc = Rc::simple_open(&path, false).expect("a writable view");
-        rc.set_group(DESKTOP_ENTRY);
+        rc.set_group(Item::DESKTOP_ENTRY);
 
         assert!(!rc.write_entry(c"Name", "nul\0byte"));
         assert!(!rc.write_list_entry(c"OnlyShowIn", &["XFCE", "nul\0byte"]));

@@ -32,6 +32,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Mutex, MutexGuard};
 use std::{env, process};
 
+
 /// The lock every [`EnvGuard`] holds, so two tests never see each other's
 /// environment. Poisoning is ignored: a panicking test leaves the environment
 /// restored by the guard's `Drop` anyway.

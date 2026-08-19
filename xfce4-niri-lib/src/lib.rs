@@ -21,8 +21,8 @@
 pub mod niri;
 pub mod syslog;
 
-#[cfg(test)]
-mod test_support;
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_support;
 
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;

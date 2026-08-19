@@ -17,3 +17,25 @@
  * License along with this library; if not, see <https://www.gnu.org/licenses/>.
  *
  ***************************************************************************/
+
+#![allow(unused_imports)]
+
+//! Helpers for the unit tests of this crate: the ones working on process wide
+//! state come from the library, next to them lives what only the `xfce` module
+//! needs.
+
+use std::sync::Once;
+
+pub use xfce4_niri_lib::test_support::{EnvGuard, TempDir};
+
+
+/// libxfce4util builds its resource directory list on the first call, without
+/// a lock: two tests getting there at once see a half built one. Every test
+/// touching `XFCE_RESOURCE_CONFIG` calls this first, so that init runs alone;
+/// the reads after it are safe from any number of threads.
+pub fn xfce_resource_ready() {
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        crate::xfce::resource_save_location("xfce4-niri-resource-warm-up", false);
+    });
+}

@@ -226,28 +226,6 @@ impl Gui {
         model
     }
 
-    /// Port of `xfae_model_get`: reads back the entry behind a row, which is what
-    /// the edit dialog is filled with.
-    fn tree_view_model_get(rel_path: &str) -> Result<(String, String, String, RunHook), glib::Error> {
-
-        let Some(rc) = xfce::Rc::config_open(rel_path, true) else {
-            return Err(glib::Error::new(
-                glib::FileError::Io,
-                &format!("Failed to open {rel_path} for reading"),
-            ))
-        };
-
-        rc.set_group(xfce::DESKTOP_ENTRY);
-
-        Ok((
-            rc.read_entry(c"Name").unwrap_or_default(),
-            rc.read_entry(c"Comment").unwrap_or_default(),
-            rc.read_entry(c"Exec").unwrap_or_default(),
-            RunHook::from_value(rc.read_int_entry(c"RunHook", RunHook::Login.value())),
-        ))
-    }
-
-
     fn tree_view_model_new() -> ListStore {
 
         let model = ListStore::new(&[
@@ -285,9 +263,9 @@ impl Gui {
     fn tree_view_model_add(&self, name: String, descr: String, command: String, run_hook: RunHook) -> ListStore {
 
         let model = self.tree_view
-            .model().expect("")
+            .model().expect("Failed to get tree view model")
             .downcast::<ListStore>()
-            .ok().expect("");
+            .ok().expect("Failed to downcast to ListStore");
 
         let icon = ThemedIcon::with_default_fallbacks(DEFAULT_ICON).upcast::<Icon>();
         model.set(&model.append(), &[
@@ -299,6 +277,10 @@ impl Gui {
             (col::RUN_HOOK, &run_hook.nick()),
             (col::RELPATH, &command),
         ]);
+
+        
+        let (_, path) = Item::free_rel_path(&name).expect("Failed to get free rel path");
+        Item::write_desktop_file(&path, &name, &descr, &command, run_hook).expect("Failed to write desktop file");
 
 
         self.tree_view.set_model(Some(&model));
@@ -447,7 +429,7 @@ impl Gui {
 
         let rel_path = Self::cell_string(&model, &iter, col::RELPATH);
 
-        let (name, descr, command, run_hook) = match Self::tree_view_model_get(&rel_path) {
+        let (name, descr, command, run_hook) = match Item::get(&rel_path) {
             Ok(entry) => entry,
             Err(error) => {
                 xfce::show_error(parent.as_ref(), Some(&error), "Failed to edit item");
