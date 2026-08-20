@@ -530,7 +530,7 @@ mod tests {
         let rc = Rc::config_open("autostart/xfce4-niri-no-such-entry.desktop", true)
             .expect("an empty view, not a failure");
 
-        rc.set_group(Item::Item::DESKTOP_ENTRY);
+        rc.set_group(Item::DESKTOP_ENTRY);
 
         assert_eq!(rc.read_entry(c"Type"), None);
         assert_eq!(rc.read_int_entry(c"RunHook", 42), 42);

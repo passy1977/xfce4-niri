@@ -20,6 +20,8 @@
 
 use std::cmp::Ordering;
 use std::ffi::CStr;
+use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use gtk::gio::{Icon, ThemedIcon};
@@ -100,7 +102,7 @@ impl Item {
 
         let Some(rc) = Rc::config_open(rel_path, true) else {
             return Err(Error::new(
-                glib::FileError::Io,
+                FileError::Io,
                 &format!("Failed to open {rel_path} for reading"),
             ))
         };
@@ -134,7 +136,7 @@ impl Item {
                 // `create`: `~/.config/autostart` può non esistere ancora.
                 let path = resource_save_location(&rel_path, true).ok_or_else(|| {
                     glib::Error::new(
-                        glib::FileError::Io,
+                        FileError::Io,
                         &format!("Failed to find a save location for {rel_path}"),
                     )
                 })?;
@@ -146,6 +148,7 @@ impl Item {
         }
     }
 
+
     pub(crate) fn store(
         path: &Path,
         name: &str,
@@ -156,7 +159,7 @@ impl Item {
 
         let Some(rc) = Rc::simple_open(path, false) else {
             return Err(Error::new(
-                glib::FileError::Io,
+                FileError::Io,
                 &format!("Failed to open {} for writing", path.display()),
             ))
         };
@@ -164,7 +167,7 @@ impl Item {
         rc.set_group(Self::DESKTOP_ENTRY);
 
         let written = rc.write_entry(c"Encoding", "UTF-8")
-            && rc.write_entry(c"Version", "0.9.4")
+            && rc.write_entry(c"Version", "0.1.0")
             && rc.write_entry(c"Type", "Application")
             && rc.write_entry(c"Name", name)
             && rc.write_entry(c"Comment", comment)
@@ -190,39 +193,32 @@ impl Item {
     }
 
 
-    pub(crate) fn remove(
-        path: &Path
-    ) -> Result<(), Error> {
+    /// Port of `xfae_model_remove`: unlinks every copy of `rel_path`, the same
+    /// list [`Self::is_removable`] has checked sits in writable directories. A
+    /// copy vanished in the meantime is not an error, the row goes away either way.
+    pub(crate) fn remove(rel_path: &str) -> Result<(), Error> {
 
-        let Some(rc) = Rc::simple_open(path, false) else {
+        let files = resource_lookup_all(rel_path);
+
+        if files.is_empty() {
             return Err(Error::new(
-                glib::FileError::Io,
-                &format!("Failed to open {} for writing", path.display()),
-            ))
-        };
-
-        let name = path.file_name().and_then(|it| it.to_str()).ok_or_else(|| {
-            Error::new(
-                FileError::Inval,
-                &format!("Failed to get the file name from {}", path.display()),
-            )
-        })?;
-
-        let cname = CStr::from_bytes_with_nul(name.as_bytes()).map_err(|_| {
-            Error::new(
-                FileError::Inval,
-                &format!("Failed to convert {} to a C string", path.display()),
-            )
-        })?;
-
-        if rc.delete_entry(cname, true) {
-            Ok(())
-        } else {
-            Err(Error::new(
-                FileError::Inval,
-                &format!("Failed to delete {} from {}", name, path.display()),
+                FileError::Noent,
+                &format!("Failed to find {rel_path}"),
             ))
         }
+
+        for file in &files {
+            match fs::remove_file(file) {
+                Ok(()) => (),
+                Err(error) if error.kind() == ErrorKind::NotFound => (),
+                Err(error) => return Err(Error::new(
+                    FileError::Io,
+                    &format!("Failed to remove {file}: {error}"),
+                )),
+            }
+        }
+
+        Ok(())
     }
 
     /// Port of `xfae_item_is_enabled`: an entry not meant for this desktop
@@ -391,6 +387,17 @@ use super::*;
 
         assert!(Item::new("autostart/nul\0byte.desktop", "XFCE", "icon").is_none());
         assert!(Item::new("autostart/xfce4-niri-no-such-entry.desktop", "XFCE", "icon").is_none());
+    }
+
+    /// The branch of [`Item::remove`] no config directory is needed for: nothing
+    /// to unlink is a failure, not a silent success — the row would go from the
+    /// list while its file stays on disk.
+    #[test]
+    fn remove_fails_when_the_file_is_nowhere() {
+
+        xfce_resource_ready();
+
+        assert!(Item::remove("autostart/xfce4-niri-no-such-entry.desktop").is_err());
     }
 
 }

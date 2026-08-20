@@ -268,14 +268,11 @@ impl Gui {
         Self::tree_view_model_new()
     }
 
-    fn tree_view_model_remove(&self, name: &String) {
-        
-
-        let (_, path) = Item::free_rel_path(&name).expect("Failed to get free rel path");
-        Item::remove(&path).map_err(|e| {
-            eprintln!("Failed to remove {}: {}", path.display(), e);
-        }).ok();
-
+    /// The rel path comes from the row itself (`col::RELPATH`): it is the file the
+    /// entry was read from, which the name alone does not give back — `free_rel_path`
+    /// suffixes a name already taken.
+    fn tree_view_model_remove(&self, rel_path: &str) -> Result<(), glib::Error> {
+        Item::remove(rel_path)
     }
 
     fn on_tree_cell_item_toggled(
@@ -316,22 +313,16 @@ impl Gui {
             return
         };
 
-        let mut items = resource_match("autostart/*.desktop", true)
-            .iter()
-            .filter_map(|rel_path| Item::new(rel_path, DESKTOP, DEFAULT_ICON))
-            .collect::<Vec<_>>();
+        let rel_path = Self::cell_string(&model, &iter, col::RELPATH);
 
-        items.sort_by(Item::sort_default);
-
-        let name = Self::cell_string(&model, &iter, col::NAME);
-        let item = items
-                        .iter()
-                        .filter(move |it| it.markup() == name)
-                        .collect::<Vec<_>>();
-        let item = item.first()
-                        .expect("Failed to find item in list");
-                        
-        self.tree_view_model_remove(&item.name);
+        if let Err(error) = self.tree_view_model_remove(&rel_path) {
+            xfce::show_error(
+                Self::toplevel(&self.tree_view).as_ref(),
+                Some(&error),
+                "Failed to remove item",
+            );
+            return
+        }
 
         model.remove(&iter);
     }
