@@ -261,35 +261,16 @@ impl Gui {
     }
 
     fn tree_view_model_add(&self, name: String, descr: String, command: String, run_hook: RunHook) -> ListStore {
-
-        // let model = self.tree_view
-        //     .model().expect("Failed to get tree view model")
-        //     .downcast::<ListStore>()
-        //     .ok().expect("Failed to downcast to ListStore");
-
-        // let icon = ThemedIcon::with_default_fallbacks(DEFAULT_ICON).upcast::<Icon>();
-        // model.set(&model.append(), &[
-        //     (col::ICON, &icon as &dyn ToValue),
-        //     (col::NAME, &name),
-        //     (col::ENABLED, &true),
-        //     (col::REMOVABLE, &true),
-        //     (col::TOOLTIP, &descr),
-        //     (col::RUN_HOOK, &run_hook.nick()),
-        //     (col::RELPATH, &command),
-        // ]);
-
-        // self.tree_view.set_model(Some(&model));
-        // model.set_sort_column_id(gtk::SortColumn::Index(1), gtk::SortType::Ascending);
-
-
+        
         let (_, path) = Item::free_rel_path(&name).expect("Failed to get free rel path");
         Item::store(&path, &name, &descr, &command, run_hook).expect("Failed to write desktop file");
 
         Self::tree_view_model_new()
     }
 
-    fn tree_view_model_remove(&self, name: String) {
+    fn tree_view_model_remove(&self, name: &String) {
         
+
         let (_, path) = Item::free_rel_path(&name).expect("Failed to get free rel path");
         Item::remove(&path).map_err(|e| {
             eprintln!("Failed to remove {}: {}", path.display(), e);
@@ -335,8 +316,22 @@ impl Gui {
             return
         };
 
+        let mut items = resource_match("autostart/*.desktop", true)
+            .iter()
+            .filter_map(|rel_path| Item::new(rel_path, DESKTOP, DEFAULT_ICON))
+            .collect::<Vec<_>>();
+
+        items.sort_by(Item::sort_default);
+
         let name = Self::cell_string(&model, &iter, col::NAME);
-        self.tree_view_model_remove(name);
+        let item = items
+                        .iter()
+                        .filter(move |it| it.markup() == name)
+                        .collect::<Vec<_>>();
+        let item = item.first()
+                        .expect("Failed to find item in list");
+                        
+        self.tree_view_model_remove(&item.name);
 
         model.remove(&iter);
     }
