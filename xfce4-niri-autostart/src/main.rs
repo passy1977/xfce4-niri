@@ -99,8 +99,7 @@ fn build_ui(app: &gtk::Application) {
     );
 
 
-    let window_clone = window.clone();
-    let (gui, gtk_box) = Gui::window_new(window_clone.clone());
+    let (gui, gtk_box) = Gui::window_new();
     
     GUI.with_borrow_mut(|it| *it = Some(gui));
 

@@ -21,15 +21,13 @@
 mod dialog;
 
 use std::rc::Rc;
-use std::sync::Arc;
 
-use gtk::gio::{Icon, ThemedIcon};
-use gtk::{ApplicationWindow, Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ScrolledWindow, SelectionMode, ShadowType, TreeView, TreeViewColumn, Box};
+use gtk::gio::{Icon};
+use gtk::{Box, Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ScrolledWindow, SelectionMode, ShadowType, TreeModel, TreeView, TreeViewColumn};
 use gtk::glib::{self, Cast, IsA, Propagation, StaticType, ToValue};
 use gtk::traits::{BoxExt, ButtonExt, CellRendererComboExt, CellRendererToggleExt, ContainerExt, GtkMenuExt, GtkMenuItemExt, GtkWindowExt, MenuShellExt, StyleContextExt, TreeModelExt, TreeSelectionExt, TreeViewColumnExt, TreeViewExt, WidgetExt};
-use gtk::prelude::{GtkListStoreExt, GtkListStoreExtManual, TreeSortableExtManual, TreeViewColumnExt as Column};
+use gtk::prelude::{GtkListStoreExt, GtkListStoreExtManual, TreeViewColumnExt as Column};
 
-use osal_rs::os::{Mutex, MutexFn};
 use crate::xfce::{self, resource_match};
 use crate::models::item::Item;
 use crate::models::run_hook::RunHook;
@@ -59,11 +57,11 @@ pub(crate) struct Gui {
 
 impl Gui {
 
-    fn cell_string(model: &impl IsA<gtk::TreeModel>, iter: &gtk::TreeIter, column: u32) -> String {
+    fn cell_string(model: &impl IsA<TreeModel>, iter: &gtk::TreeIter, column: u32) -> String {
         model.value(iter, column as i32).get::<String>().unwrap_or_default()
     }
 
-    fn cell_bool(model: &impl IsA<gtk::TreeModel>, iter: &gtk::TreeIter, column: u32) -> bool {
+    fn cell_bool(model: &impl IsA<TreeModel>, iter: &gtk::TreeIter, column: u32) -> bool {
         model.value(iter, column as i32).get::<bool>().unwrap_or_default()
     }
 
@@ -73,7 +71,7 @@ impl Gui {
         widget.toplevel().and_then(|it| it.downcast::<gtk::Window>().ok())
     }
 
-    pub(crate) fn window_new(window: Arc<Mutex<ApplicationWindow>>) -> (Rc<Self>, Box) {
+    pub(crate) fn window_new() -> (Rc<Self>, Box) {
 
         let vbox = Box::builder()
             .orientation(Orientation::Vertical)
@@ -201,11 +199,13 @@ impl Gui {
             .spacing(0)
             .build();
 
-        let window = window.clone();
         let close = button("Close", "window-close-symbolic", "Close application");
-        close.connect_clicked(move |_| {
-            window.lock().unwrap().close();
+        close.connect_clicked(|btn| {
+            if let Some(w) = Self::toplevel(btn) {
+                w.close();
+            }
         });
+
         // close.set_margin_top(12);
         v_close_box.pack_end(&close, false, false, 0);
         vbox.pack_start(&v_close_box, false, false, 0);
@@ -262,31 +262,39 @@ impl Gui {
 
     fn tree_view_model_add(&self, name: String, descr: String, command: String, run_hook: RunHook) -> ListStore {
 
-        let model = self.tree_view
-            .model().expect("Failed to get tree view model")
-            .downcast::<ListStore>()
-            .ok().expect("Failed to downcast to ListStore");
+        // let model = self.tree_view
+        //     .model().expect("Failed to get tree view model")
+        //     .downcast::<ListStore>()
+        //     .ok().expect("Failed to downcast to ListStore");
 
-        let icon = ThemedIcon::with_default_fallbacks(DEFAULT_ICON).upcast::<Icon>();
-        model.set(&model.append(), &[
-            (col::ICON, &icon as &dyn ToValue),
-            (col::NAME, &name),
-            (col::ENABLED, &true),
-            (col::REMOVABLE, &true),
-            (col::TOOLTIP, &descr),
-            (col::RUN_HOOK, &run_hook.nick()),
-            (col::RELPATH, &command),
-        ]);
+        // let icon = ThemedIcon::with_default_fallbacks(DEFAULT_ICON).upcast::<Icon>();
+        // model.set(&model.append(), &[
+        //     (col::ICON, &icon as &dyn ToValue),
+        //     (col::NAME, &name),
+        //     (col::ENABLED, &true),
+        //     (col::REMOVABLE, &true),
+        //     (col::TOOLTIP, &descr),
+        //     (col::RUN_HOOK, &run_hook.nick()),
+        //     (col::RELPATH, &command),
+        // ]);
 
+        // self.tree_view.set_model(Some(&model));
+        // model.set_sort_column_id(gtk::SortColumn::Index(1), gtk::SortType::Ascending);
+
+
+        let (_, path) = Item::free_rel_path(&name).expect("Failed to get free rel path");
+        Item::store(&path, &name, &descr, &command, run_hook).expect("Failed to write desktop file");
+
+        Self::tree_view_model_new()
+    }
+
+    fn tree_view_model_remove(&self, name: String) {
         
         let (_, path) = Item::free_rel_path(&name).expect("Failed to get free rel path");
-        Item::write_desktop_file(&path, &name, &descr, &command, run_hook).expect("Failed to write desktop file");
+        Item::remove(&path).map_err(|e| {
+            eprintln!("Failed to remove {}: {}", path.display(), e);
+        }).ok();
 
-
-        self.tree_view.set_model(Some(&model));
-        model.set_sort_column_id(gtk::SortColumn::Index(1), gtk::SortType::Ascending);
-
-        model
     }
 
     fn on_tree_cell_item_toggled(
@@ -326,6 +334,9 @@ impl Gui {
         let Ok(model) = model.downcast::<gtk::ListStore>() else {
             return
         };
+
+        let name = Self::cell_string(&model, &iter, col::NAME);
+        self.tree_view_model_remove(name);
 
         model.remove(&iter);
     }

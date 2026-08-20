@@ -146,7 +146,7 @@ impl Item {
         }
     }
 
-    pub(crate) fn write_desktop_file(
+    pub(crate) fn store(
         path: &Path,
         name: &str,
         comment: &str,
@@ -187,6 +187,42 @@ impl Item {
         rc.flush();
 
         Ok(())
+    }
+
+
+    pub(crate) fn remove(
+        path: &Path
+    ) -> Result<(), Error> {
+
+        let Some(rc) = Rc::simple_open(path, false) else {
+            return Err(Error::new(
+                glib::FileError::Io,
+                &format!("Failed to open {} for writing", path.display()),
+            ))
+        };
+
+        let name = path.file_name().and_then(|it| it.to_str()).ok_or_else(|| {
+            Error::new(
+                FileError::Inval,
+                &format!("Failed to get the file name from {}", path.display()),
+            )
+        })?;
+
+        let cname = CStr::from_bytes_with_nul(name.as_bytes()).map_err(|_| {
+            Error::new(
+                FileError::Inval,
+                &format!("Failed to convert {} to a C string", path.display()),
+            )
+        })?;
+
+        if rc.delete_entry(cname, true) {
+            Ok(())
+        } else {
+            Err(Error::new(
+                FileError::Inval,
+                &format!("Failed to delete {} from {}", name, path.display()),
+            ))
+        }
     }
 
     /// Port of `xfae_item_is_enabled`: an entry not meant for this desktop
@@ -237,7 +273,9 @@ impl Item {
 #[cfg(test)]
 mod tests {
 
-    use super::*;
+    use xfce4_niri_lib::test_support::TempDir;
+
+use super::*;
     use crate::test_support::xfce_resource_ready;
 
     /// An item built by hand: [`Item::new`] needs a real `.desktop` file under
@@ -354,4 +392,5 @@ mod tests {
         assert!(Item::new("autostart/nul\0byte.desktop", "XFCE", "icon").is_none());
         assert!(Item::new("autostart/xfce4-niri-no-such-entry.desktop", "XFCE", "icon").is_none());
     }
+
 }
