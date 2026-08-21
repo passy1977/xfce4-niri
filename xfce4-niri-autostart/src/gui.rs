@@ -23,7 +23,7 @@ mod dialog;
 use std::rc::Rc;
 
 use gtk::gio::{Icon};
-use gtk::{Box, Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ScrolledWindow, SelectionMode, ShadowType, TreeModel, TreeView, TreeViewColumn};
+use gtk::{Box, Button, CellRendererCombo, CellRendererMode, CellRendererPixbuf, CellRendererText, CellRendererToggle, IconSize, Image, ListStore, Orientation, PolicyType, ResponseType, ScrolledWindow, SelectionMode, ShadowType, TreeModel, TreeView, TreeViewColumn};
 use gtk::glib::{self, Cast, IsA, Propagation, StaticType, ToValue};
 use gtk::traits::{BoxExt, ButtonExt, CellRendererComboExt, CellRendererToggleExt, ContainerExt, GtkMenuExt, GtkMenuItemExt, GtkWindowExt, MenuShellExt, StyleContextExt, TreeModelExt, TreeSelectionExt, TreeViewColumnExt, TreeViewExt, WidgetExt};
 use gtk::prelude::{GtkListStoreExt, GtkListStoreExtManual, TreeViewColumnExt as Column};
@@ -63,6 +63,10 @@ impl Gui {
 
     fn cell_bool(model: &impl IsA<TreeModel>, iter: &gtk::TreeIter, column: u32) -> bool {
         model.value(iter, column as i32).get::<bool>().unwrap_or_default()
+    }
+
+    fn cell_i32(model: &impl IsA<TreeModel>, iter: &gtk::TreeIter, column: u32) -> i32 {
+        model.value(iter, column as i32).get::<i32>().unwrap_or_default()
     }
 
     /// `gtk_widget_get_toplevel`, as far as it is a window: the parent the dialogs
@@ -113,13 +117,9 @@ impl Gui {
 
         let column = TreeViewColumn::builder().reorderable(false).resizable(false).build();
         let renderer = CellRendererToggle::new();
-        // let on_item_toggled_cb = on_item_toggled.clone();
-        // renderer.connect_toggled(glib::clone!(@weak model => move |_, path| {
-        //     let callback = on_item_toggled_cb.lock().expect("Failed to lock on_item_toggled mutex");
-        //     (*callback)(&model, &path);
-        // }));
-        renderer.connect_toggled(glib::clone!(@weak model => move |_, path| {
-            Self::on_tree_cell_item_toggled(&model, &path);
+        renderer.connect_toggled(glib::clone!(
+            @weak model, @weak this => move |_, path| {
+            this.on_item_toggled(&model, &path);
         }));
 
         Column::pack_start(&column, &renderer, false);
@@ -137,6 +137,7 @@ impl Gui {
         let renderer = CellRendererPixbuf::new();
         Column::pack_start(&column, &renderer, false);
         Column::add_attribute(&column, &renderer, "gicon", col::ICON as i32);
+        
         let renderer = CellRendererText::builder().ellipsize(gtk::pango::EllipsizeMode::End).build();
         Column::pack_start(&column, &renderer, true);
         Column::add_attribute(&column, &renderer, "markup", col::NAME as i32);
@@ -149,6 +150,7 @@ impl Gui {
             .reorderable(false)
             .resizable(false)
             .build();
+        
         let renderer = CellRendererCombo::builder()
             .has_entry(false)
             .model(&Self::combo_model_new())
@@ -275,7 +277,8 @@ impl Gui {
         Item::remove(rel_path)
     }
 
-    fn on_tree_cell_item_toggled(
+    fn on_item_toggled(
+        self: &Rc<Self>,
         model: &gtk::ListStore, 
         path: &gtk::TreePath
     ) {
@@ -286,6 +289,29 @@ impl Gui {
 
         let enabled = Self::cell_bool(model, &iter, col::ENABLED);
         model.set_value(&iter, col::ENABLED, &(!enabled).to_value());
+        let enabled = Self::cell_bool(model, &iter, col::ENABLED);
+
+        if !enabled {
+            self.on_menu_remove_clicked();
+        } else {
+            //TODO: to fix
+            let icon = Self::cell_string(model, &iter, col::ICON);
+            let name = Self::cell_string(model, &iter, col::NAME);
+            let tooltip = Self::cell_string(model, &iter, col::TOOLTIP);
+            let run_hook = Self::cell_i32(model, &iter, col::RUN_HOOK);
+            
+            let (_, rel_path) = Item::free_rel_path(&name).expect("Failed to get free rel path");
+
+            if let Err(error) = Item::store(&rel_path, &name, &tooltip, &icon, RunHook::from_value(run_hook)) {
+                xfce::show_error(
+                    Self::toplevel(&self.tree_view).as_ref(),
+                    Some(&error),
+                    "Failed to update item",
+                );
+                return
+            }
+        }
+
     }
 
 
@@ -295,7 +321,7 @@ impl Gui {
         let dialog = Dialog::new(parent.as_ref(), None, None, None, RunHook::Login);
 
         let model =
-            if dialog.run() == gtk::ResponseType::Ok {
+            if dialog.run() == ResponseType::Ok {
                 dialog.hide();
                 let (name, descr, command, run_hook) = dialog.get();
                 self.tree_view_model_add(name, descr, command, run_hook)
@@ -401,7 +427,7 @@ impl Gui {
         let parent = Self::toplevel(&self.tree_view);
         let dialog = Dialog::new(parent.as_ref(), None, None, None, RunHook::Login);
 
-        if dialog.run() == gtk::ResponseType::Ok {
+        if dialog.run() == ResponseType::Ok {
             dialog.hide();
             let (_name, _descr, _command, _run_hook) = dialog.get();
         }
@@ -448,7 +474,7 @@ impl Gui {
             run_hook,
         );
 
-        if dialog.run() == gtk::ResponseType::Ok {
+        if dialog.run() == ResponseType::Ok {
             dialog.hide();
             let (_name, _descr, _command, _run_hook) = dialog.get();
         }
