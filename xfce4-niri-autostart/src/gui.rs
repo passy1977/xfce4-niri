@@ -179,11 +179,11 @@ impl Gui {
         };
 
         let add = button("Add", "list-add-symbolic", "Add application");
-        add.connect_clicked(glib::clone!(@weak this => move |_| this.on_button_add_clicked()));
+        add.connect_clicked(glib::clone!(@weak this => move |_| this.on_menu_add_clicked()));
         bbox.pack_start(&add, false, false, 0);
 
         let remove = button("Remove", "list-remove-symbolic", "Remove application");
-        remove.connect_clicked(glib::clone!(@weak this => move |_| this.on_button_remove_clicked()));
+        remove.connect_clicked(glib::clone!(@weak this => move |_| this.on_menu_remove_clicked()));
         bbox.pack_start(&remove, false, false, 0);
 
         let edit = button("Edit", "document-edit-symbolic", "Edit application");
@@ -420,32 +420,6 @@ impl Gui {
 
         let nick = Self::cell_string(&combo_model, combo_iter, 0);
         model.set_value(&iter, col::RUN_HOOK, &nick.to_value());
-    }
-
-    fn on_button_add_clicked(&self) {
-
-        let parent = Self::toplevel(&self.tree_view);
-        let dialog = Dialog::new(parent.as_ref(), None, None, None, RunHook::Login);
-
-        if dialog.run() == ResponseType::Ok {
-            dialog.hide();
-            let (_name, _descr, _command, _run_hook) = dialog.get();
-        }
-
-        dialog.destroy();
-    }
-
-    fn on_button_remove_clicked(&self) {
-
-        let Some((model, iter)) = self.tree_view.selection().selected() else {
-            return
-        };
-
-        let Ok(model) = model.downcast::<gtk::ListStore>() else {
-            return
-        };
-
-        model.remove(&iter);
     }
 
     fn on_button_edit_clicked(&self) {
