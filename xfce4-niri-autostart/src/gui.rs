@@ -450,7 +450,19 @@ impl Gui {
 
         if dialog.run() == ResponseType::Ok {
             dialog.hide();
-            let (_name, _descr, _command, _run_hook) = dialog.get();
+            let (name, descr, command, run_hook) = dialog.get();
+
+            if let Err(error) = self.tree_view_model_remove(&rel_path) {
+                xfce::show_error(
+                    Self::toplevel(&self.tree_view).as_ref(),
+                    Some(&error),
+                    "Failed to remove item",
+                );
+                return
+            }
+            let model = self.tree_view_model_add(name, descr, command, run_hook);
+
+            self.tree_view.set_model(Some(&model));
         }
 
         dialog.destroy();
