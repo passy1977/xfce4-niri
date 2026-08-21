@@ -294,13 +294,19 @@ impl Gui {
         let parent = Self::toplevel(&self.tree_view);
         let dialog = Dialog::new(parent.as_ref(), None, None, None, RunHook::Login);
 
-        if dialog.run() == gtk::ResponseType::Ok {
-            dialog.hide();
-            let (name, descr, command, run_hook) = dialog.get();
-            self.tree_view_model_add(name, descr, command, run_hook);
-        }
+        let model =
+            if dialog.run() == gtk::ResponseType::Ok {
+                dialog.hide();
+                let (name, descr, command, run_hook) = dialog.get();
+                self.tree_view_model_add(name, descr, command, run_hook)
+            } else {
+                Self::tree_view_model_new()
+            };
 
         dialog.destroy();
+
+        self.tree_view.set_model(Some(&model));
+
     }
 
     fn on_menu_remove_clicked(&self) {
