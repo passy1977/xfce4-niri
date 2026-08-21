@@ -48,7 +48,7 @@ mod col {
     pub(crate) const REMOVABLE: u32 = 3;
     pub(crate) const TOOLTIP: u32 = 4;
     pub(crate) const RUN_HOOK: u32 = 5;
-    pub(crate) const RELPATH: u32 = 6;
+    pub(crate) const REL_PATH: u32 = 6;
 }
 
 pub(crate) struct Gui {
@@ -118,7 +118,7 @@ impl Gui {
         let column = TreeViewColumn::builder().reorderable(false).resizable(false).build();
         let renderer = CellRendererToggle::new();
         renderer.connect_toggled(glib::clone!(
-            @weak model, @weak this => move |_, path| {
+            @weak this, @weak model => move |_, path| {
             this.on_item_toggled(&model, &path);
         }));
 
@@ -158,8 +158,8 @@ impl Gui {
             .editable(true)
             .mode(CellRendererMode::Editable)
             .build();
-        renderer.connect_changed(glib::clone!(@weak model => move |combo, path, combo_iter| {
-            Self::on_combo_changed(&model, combo, &path, combo_iter);
+        renderer.connect_changed(glib::clone!(@weak this, @weak model => move |combo, path, combo_iter| {
+            this.on_combo_changed(&model, combo, &path, combo_iter);
         }));
         Column::pack_start(&column, &renderer, false);
         Column::add_attribute(&column, &renderer, "text", col::RUN_HOOK as i32);
@@ -190,10 +190,10 @@ impl Gui {
         edit.connect_clicked(glib::clone!(@weak this => move |_| this.on_button_edit_clicked()));
         bbox.pack_start(&edit, false, false, 0);
 
-        selection.connect_changed(glib::clone!(@weak remove, @weak edit => move |selection| {
-            Self::on_tree_view_selection_changed(selection, &remove, &edit);
-        }));
-        Self::on_tree_view_selection_changed(&selection, &remove, &edit);
+        selection.connect_changed(glib::clone!(@weak this, @weak remove, @weak edit => move |selection|
+            this.on_tree_view_selection_changed(selection, &remove, &edit)
+        ));
+        this.on_tree_view_selection_changed(&selection, &remove, &edit);
 
 
         let v_close_box = Box::builder()
@@ -202,13 +202,12 @@ impl Gui {
             .build();
 
         let close = button("Close", "window-close-symbolic", "Close application");
-        close.connect_clicked(|btn| {
+        close.connect_clicked(|btn| 
             if let Some(w) = Self::toplevel(btn) {
                 w.close();
             }
-        });
+        );
 
-        // close.set_margin_top(12);
         v_close_box.pack_end(&close, false, false, 0);
         vbox.pack_start(&v_close_box, false, false, 0);
         
@@ -255,7 +254,7 @@ impl Gui {
                 (col::REMOVABLE, &item.is_removable()),
                 (col::TOOLTIP, &item.tooltip),
                 (col::RUN_HOOK, &item.run_hook.nick()),
-                (col::RELPATH, &item.rel_path),
+                (col::REL_PATH, &item.rel_path),
             ]);
         }
 
@@ -345,7 +344,7 @@ impl Gui {
             return
         };
 
-        let rel_path = Self::cell_string(&model, &iter, col::RELPATH);
+        let rel_path = Self::cell_string(&model, &iter, col::REL_PATH);
 
         if let Err(error) = self.tree_view_model_remove(&rel_path) {
             xfce::show_error(
@@ -404,6 +403,7 @@ impl Gui {
     }
 
     fn on_combo_changed(
+        self: &Rc<Self>,
         model: &gtk::ListStore,
         combo: &gtk::CellRendererCombo,
         path: &gtk::TreePath,
@@ -430,7 +430,7 @@ impl Gui {
             return
         };
 
-        let rel_path = Self::cell_string(&model, &iter, col::RELPATH);
+        let rel_path = Self::cell_string(&model, &iter, col::REL_PATH);
 
         let (name, descr, command, run_hook) = match Item::get(&rel_path) {
             Ok(entry) => entry,
@@ -478,6 +478,7 @@ impl Gui {
     /// anyway, and its `Exec` is worth looking at even when the file cannot be
     /// rewritten in place.
     fn on_tree_view_selection_changed(
+        self: &Rc<Self>,
         selection: &gtk::TreeSelection,
         remove: &gtk::Button,
         edit: &gtk::Button,
