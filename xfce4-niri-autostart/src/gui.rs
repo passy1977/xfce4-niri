@@ -314,7 +314,7 @@ impl Gui {
     }
 
 
-    fn on_menu_add_clicked(&self) {
+    fn on_menu_add_clicked(self: &Rc<Self>) {
 
         let parent = Self::toplevel(&self.tree_view);
         let dialog = Dialog::new(parent.as_ref(), None, None, None, RunHook::Login);
@@ -334,7 +334,7 @@ impl Gui {
 
     }
 
-    fn on_menu_remove_clicked(&self) {
+    fn on_menu_remove_clicked(self: &Rc<Self>) {
 
         let Some((model, iter)) = self.tree_view.selection().selected() else {
             return
@@ -422,7 +422,7 @@ impl Gui {
         model.set_value(&iter, col::RUN_HOOK, &nick.to_value());
     }
 
-    fn on_button_edit_clicked(&self) {
+    fn on_button_edit_clicked(self: &Rc<Self>) {
 
         let parent = Self::toplevel(&self.tree_view);
 
