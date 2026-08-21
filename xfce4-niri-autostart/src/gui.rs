@@ -29,7 +29,7 @@ use gtk::traits::{BoxExt, ButtonExt, CellRendererComboExt, CellRendererToggleExt
 use gtk::prelude::{GtkListStoreExt, GtkListStoreExtManual, TreeViewColumnExt as Column};
 
 use crate::xfce::{self, resource_match};
-use crate::models::item::Item;
+use crate::models::item::{Item, State};
 use crate::models::run_hook::RunHook;
 
 use crate::gui::dialog::Dialog;
@@ -63,10 +63,6 @@ impl Gui {
 
     fn cell_bool(model: &impl IsA<TreeModel>, iter: &gtk::TreeIter, column: u32) -> bool {
         model.value(iter, column as i32).get::<bool>().unwrap_or_default()
-    }
-
-    fn cell_i32(model: &impl IsA<TreeModel>, iter: &gtk::TreeIter, column: u32) -> i32 {
-        model.value(iter, column as i32).get::<i32>().unwrap_or_default()
     }
 
     /// `gtk_widget_get_toplevel`, as far as it is a window: the parent the dialogs
@@ -276,6 +272,11 @@ impl Gui {
         Item::remove(rel_path)
     }
 
+    /// The toggle never removes anything the user can still see: a system entry
+    /// out of `/etc/xdg/autostart` is shadowed by a copy under
+    /// `~/.config/autostart` carrying the new state, and that copy goes again as
+    /// soon as the row is toggled back onto the state the system file holds.
+    /// The row itself stays either way, only its state changes.
     fn on_item_toggled(
         self: &Rc<Self>,
         model: &gtk::ListStore, 
@@ -286,31 +287,27 @@ impl Gui {
             return
         };
 
-        let enabled = Self::cell_bool(model, &iter, col::ENABLED);
-        model.set_value(&iter, col::ENABLED, &(!enabled).to_value());
-        let enabled = Self::cell_bool(model, &iter, col::ENABLED);
+        let rel_path = Self::cell_string(model, &iter, col::REL_PATH);
+        let enabled = !Self::cell_bool(model, &iter, col::ENABLED);
 
-        if !enabled {
-            self.on_menu_remove_clicked();
-        } else {
-            //TODO: to fix
-            let icon = Self::cell_string(model, &iter, col::ICON);
-            let name = Self::cell_string(model, &iter, col::NAME);
-            let tooltip = Self::cell_string(model, &iter, col::TOOLTIP);
-            let run_hook = Self::cell_i32(model, &iter, col::RUN_HOOK);
-            
-            let (_, rel_path) = Item::free_rel_path(&name).expect("Failed to get free rel path");
+        let state = State {
+            enabled,
+            run_hook: RunHook::from_nick(&Self::cell_string(model, &iter, col::RUN_HOOK)),
+        };
 
-            if let Err(error) = Item::store(&rel_path, &name, &tooltip, &icon, RunHook::from_value(run_hook)) {
-                xfce::show_error(
-                    Self::toplevel(&self.tree_view).as_ref(),
-                    Some(&error),
-                    "Failed to update item",
-                );
-                return
-            }
+        if let Err(error) = Item::set_state(&rel_path, DESKTOP, state) {
+            xfce::show_error(
+                Self::toplevel(&self.tree_view).as_ref(),
+                Some(&error),
+                "Failed to update item",
+            );
+            return
         }
 
+        // `col::REMOVABLE` is left alone on purpose: the user copy comes and
+        // goes next to a system file that stays put, so the entry keeps a copy
+        // in a directory it cannot write to either way.
+        model.set_value(&iter, col::ENABLED, &enabled.to_value());
     }
 
 
@@ -402,6 +399,11 @@ impl Gui {
         glib::Propagation::Stop
     }
 
+    /// The trigger goes the way the toggle does: a system entry out of
+    /// `/etc/xdg/autostart` is shadowed by a copy under `~/.config/autostart`
+    /// carrying the new one, and that copy goes again as soon as the row is put
+    /// back on what the system file says — the trigger *and* the toggle, since
+    /// the one copy answers for both.
     fn on_combo_changed(
         self: &Rc<Self>,
         model: &gtk::ListStore,
@@ -419,6 +421,28 @@ impl Gui {
         };
 
         let nick = Self::cell_string(&combo_model, combo_iter, 0);
+
+        // The combo hands the row it was left on, changed or not.
+        if nick == Self::cell_string(model, &iter, col::RUN_HOOK) {
+            return
+        }
+
+        let rel_path = Self::cell_string(model, &iter, col::REL_PATH);
+
+        let state = State {
+            enabled: Self::cell_bool(model, &iter, col::ENABLED),
+            run_hook: RunHook::from_nick(&nick),
+        };
+
+        if let Err(error) = Item::set_state(&rel_path, DESKTOP, state) {
+            xfce::show_error(
+                Self::toplevel(&self.tree_view).as_ref(),
+                Some(&error),
+                "Failed to update item",
+            );
+            return
+        }
+
         model.set_value(&iter, col::RUN_HOOK, &nick.to_value());
     }
 

@@ -69,6 +69,12 @@ impl RunHook {
         Self::ALL.iter().position(|it| *it == self).unwrap_or_default() as i32
     }
 
+    /// `g_enum_get_value_by_nick (klass, nick)`: the way back from what a combo
+    /// row shows, with the same fallback [`RunHook::from_value`] takes.
+    pub(crate) fn from_nick(nick: &str) -> Self {
+        Self::ALL.iter().find(|it| it.nick() == nick).copied().unwrap_or_default()
+    }
+
     /// `GEnumValue.value_nick`.
     pub(crate) fn nick(self) -> &'static str {
         match self {
@@ -125,6 +131,24 @@ mod tests {
     #[test]
     fn default_is_login() {
         assert!(RunHook::default() == RunHook::Login);
+    }
+
+    /// The nick a combo row shows has to read back as the hook it came from.
+    #[test]
+    fn from_nick_and_nick_round_trip() {
+
+        for hook in RunHook::ALL {
+            assert!(RunHook::from_nick(hook.nick()) == hook, "{}", hook.nick());
+        }
+    }
+
+    /// A nick out of no combo row falls back the way a stale value does.
+    #[test]
+    fn from_nick_falls_back_to_login() {
+
+        for nick in ["", "on switch user", "ON LOGOUT", "nonsense"] {
+            assert!(RunHook::from_nick(nick) == RunHook::Login, "{nick} should fall back");
+        }
     }
 
     #[test]
