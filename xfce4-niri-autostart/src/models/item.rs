@@ -30,8 +30,7 @@ use gtk::glib::{self, Cast, Error, FileError, IntoGStr, markup_escape_text};
 use crate::xfce::{Rc, is_accessible_dir, resource_lookup_all, resource_save_location};
 
 use xfce4_niri_lib::binary_exists;
-// use crate::gui::{DEFAULT_ICON, DESKTOP, binary_exists, is_accessible_dir};
-use crate::models::run_hook::RunHook;
+use xfce4_niri_lib::models::run_hook::RunHook;
 
 
 /// Port of `XfaeItem`: one `autostart/*.desktop` file, as read through

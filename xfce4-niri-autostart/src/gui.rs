@@ -30,7 +30,7 @@ use gtk::prelude::{GtkListStoreExt, GtkListStoreExtManual, TreeViewColumnExt as 
 
 use crate::xfce::{self, resource_match};
 use crate::models::item::{Item, State};
-use crate::models::run_hook::RunHook;
+use xfce4_niri_lib::models::run_hook::RunHook;
 
 use crate::gui::dialog::Dialog;
 

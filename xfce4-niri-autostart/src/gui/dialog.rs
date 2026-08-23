@@ -25,7 +25,7 @@
 use gtk::glib;
 use gtk::traits::{BoxExt, ButtonExt, ComboBoxTextExt, ContainerExt, DialogExt, EntryExt, FileChooserExt, GridExt, GtkWindowExt, WidgetExt};
 use gtk::prelude::{ComboBoxExtManual, WidgetExtManual};
-use crate::models::run_hook::RunHook;
+use xfce4_niri_lib::models::run_hook::RunHook;
 
 /// Port of `XfaeDialog`: name, description, command and trigger of one entry.
 pub(super) struct Dialog {
