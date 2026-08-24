@@ -35,8 +35,9 @@ use std::ffi::c_int;
 use std::rc::Rc;
 
 use gtk::Application;
+use gtk::gio::DesktopAppInfo;
 use gtk::gio::prelude::ApplicationExtManual;
-use gtk::gio::traits::ApplicationExt;
+use gtk::gio::traits::{AppInfoExt, ApplicationExt};
 use gtk::traits::{WidgetExt, ContainerExt};
 use osal_rs::os::{Mutex, MutexFn};
 use xfce4_niri_lib::niri::Niri;
@@ -46,6 +47,7 @@ use crate::data::Data;
 use crate::gui::Gui;
 
 const APP_ID: &str = "it.salsi.xfce-niri.AutoStart";
+const APP_NAME_FALLBACK: &str = "Xfce4 niri Autostart";
 
 fn main() -> Result<(), Box<dyn Error>> {
 
@@ -81,6 +83,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn app_name() -> String {
+    DesktopAppInfo::new(&format!("{APP_ID}{}", ".desktop"))
+        .map(|it| it.name().to_string())
+        .unwrap_or_else(|| APP_NAME_FALLBACK.to_string())
+}
+
 fn build_ui(app: &gtk::Application) {
 
     // The signal handlers only hold a weak reference to the `Gui`, so the strong
@@ -92,7 +100,7 @@ fn build_ui(app: &gtk::Application) {
     let window = Mutex::new_arc(
         gtk::ApplicationWindow::builder()
         .application(app)
-        .title("Xfce4-niri Autostart")
+        .title(app_name().as_str())
         .default_width(600)
         .default_height(450)
         .build()
