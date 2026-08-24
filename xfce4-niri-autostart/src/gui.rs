@@ -76,7 +76,7 @@ impl Gui {
         let vbox = Box::builder()
             .orientation(Orientation::Vertical)
             .spacing(0)
-            .border_width(12)
+            // .border_width(12)
             .build();
 
         let swin = ScrolledWindow::builder()

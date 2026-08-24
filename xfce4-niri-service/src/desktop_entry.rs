@@ -27,6 +27,7 @@ use std::fs::read_to_string;
 use std::path::Path;
 
 use osal_rs::utils::{Error, Result};
+use xfce4_niri_lib::models::run_hook::RunHook;
 
 pub(crate) const DESKTOP_SUFFIX: &str = ".desktop";
 
@@ -109,6 +110,14 @@ impl DesktopEntry {
             "false" => Some(false),
             _ => None
         }
+    }
+
+    pub(crate) fn integer(&self, key: &str) -> Option<i32> {
+        String::from(self.raw(key)?).parse().ok()
+    }
+
+    pub(crate) fn contains_key(&self, key: &str) -> bool {
+        self.entries.contains_key(key) && self.integer(key).is_some()
     }
 
     /// Splits a `;` separated list, honouring `\;` as a literal semicolon.
@@ -218,6 +227,22 @@ impl DesktopEntry {
         // Not in the spec, but honoured by Xfce and GNOME alike.
         if !self.boolean("X-GNOME-Autostart-enabled").unwrap_or(true) {
             return Err("X-GNOME-Autostart-enabled is false")
+        }
+
+        if !self.boolean("X-GNOME-Autostart-enabled").unwrap_or(true) {
+            return Err("X-GNOME-Autostart-enabled is false")
+        }
+
+        if self.contains_key("RunHook") {
+            let run_hook = self.integer("RunHook");
+            if run_hook.is_none() {
+                return Err("RunHook parse error");
+            }
+
+            let run_hook = run_hook.unwrap_or_default();
+            if run_hook != RunHook::Login.into() {
+                return Ok(());
+            }
         }
 
         let only_show_in = self.list("OnlyShowIn");
