@@ -40,6 +40,12 @@ pub enum RunHook {
     // SwitchUser,
 }
 
+impl Into<i32> for RunHook {
+    fn into(self) -> i32 {
+        self.value()
+    }
+}
+
 impl RunHook {
 
     /// In `GEnumValue` order, the order the combo boxes list them in.
