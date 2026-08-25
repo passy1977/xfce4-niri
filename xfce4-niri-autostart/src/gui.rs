@@ -88,7 +88,7 @@ impl Gui {
 
         let model = Self::tree_view_model_new();
 
-        let tree_view = gtk::TreeView::builder()
+        let tree_view = TreeView::builder()
             .model(&model)
             .headers_visible(true)
             .tooltip_column(col::TOOLTIP as i32)
@@ -160,6 +160,8 @@ impl Gui {
         Column::pack_start(&column, &renderer, false);
         Column::add_attribute(&column, &renderer, "text", col::RUN_HOOK as i32);
         column.set_sort_column_id(col::RUN_HOOK as i32);
+        #[cfg(not(feature = "enable-trigger"))]
+        column.set_visible(false);
         tree_view.append_column(&column);
 
         // The inline toolbar.
@@ -254,6 +256,7 @@ impl Gui {
             ]);
         }
 
+        
         model
     }
 
@@ -358,7 +361,7 @@ impl Gui {
 
     fn on_mouse_right_clicked(
         self: &Rc<Self>,
-        tree_view: &gtk::TreeView,
+        tree_view: &TreeView,
         event: &gtk::gdk::EventButton,
     ) -> glib::Propagation {
 

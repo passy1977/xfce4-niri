@@ -94,24 +94,30 @@ impl Dialog {
         for hook in RunHook::ALL {
             run_hook_combo.append_text(hook.nick());
         }
-        run_hook_combo.set_active(Some(run_hook.value() as u32));
-        grid.attach(&label("Trigger:"), 0, 3, 1, 1);
-        grid.attach(&run_hook_combo, 1, 3, 1, 1);
+        #[cfg(not(feature = "enable-trigger"))]
+        {
+            run_hook_combo.set_active(Some(run_hook.value() as u32));
+            grid.attach(&label("Trigger:"), 0, 3, 1, 1);
+            grid.attach(&run_hook_combo, 1, 3, 1, 1);
+        }
+
 
         browse.connect_clicked(
-            glib::clone!(@weak dialog, @weak command_entry => move |_| Self::browse(&dialog, &command_entry)),
+            glib::clone!(@weak dialog, @weak command_entry => move |_| 
+                Self::browse(&dialog, &command_entry)
+            )
         );
 
         // `xfae_dialog_update`: OK stays insensitive until both are filled in.
         name_entry.connect_text_notify(
-            glib::clone!(@weak dialog, @weak command_entry => move |name_entry| {
-                Self::update(&dialog, name_entry, &command_entry);
-            }),
+            glib::clone!(@weak dialog, @weak command_entry => move |name_entry|                 
+                Self::update(&dialog, name_entry, &command_entry)
+            )
         );
         command_entry.connect_text_notify(
-            glib::clone!(@weak dialog, @weak name_entry => move |command_entry| {
-                Self::update(&dialog, &name_entry, command_entry);
-            }),
+            glib::clone!(@weak dialog, @weak name_entry => move |command_entry| 
+                Self::update(&dialog, &name_entry, command_entry)
+            )
         );
 
         if let Some(name) = name {

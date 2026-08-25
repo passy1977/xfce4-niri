@@ -12,6 +12,9 @@ documentation = "https://docs.rs/xfce4-niri"
 readme = "../README.md"
 keywords = ["niri", "xfce4", "embedded", "posix"]
 
+[features]
+enable-trigger = []
+
 [dependencies]
 xfce4-niri-lib = { version = "0", path = "../xfce4-niri-lib" }
 osal-rs = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["posix", "serde"]}
