@@ -86,7 +86,7 @@ macro_rules! update_power_manager_data {
 
 impl LockScreen {
 
-    const APP_TAG: &str = "Autostart";
+    const APP_TAG: &str = "LockScreen";
 
     const XFCE4_PM_CHANNEL: &str = "xfce4-power-manager";
     const XFCE4_PM_PROPERTY_PRESENTATION_MODE: &str = "/xfce4-power-manager/presentation-mode";
@@ -127,7 +127,7 @@ impl LockScreen {
         };
 
         Self {
-            thread: Thread::new("brightness_thd", 0, 0),
+            thread: Thread::new("lock_screen_thd", 0, 0),
             data: Mutex::new_arc(LockScreenData {
                 is_desktop,
                 ..Default::default()

@@ -65,7 +65,7 @@ impl Drop for SysLog {
 
 impl SysLog {
 
-    const APP_TAG: &CStr = c"xfce4-niri-service";
+    const APP_TAG: &CStr = c"SysLog";
 
     pub fn open(option: c_int) -> Self {
         unsafe {
