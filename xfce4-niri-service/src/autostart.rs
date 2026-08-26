@@ -21,9 +21,10 @@
 use std::collections::HashMap;
 use std::env::{self};
 use std::ffi::c_int;
+use std::fs;
 // use std::ffi::c_int;
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::{self, Child, Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -111,14 +112,52 @@ impl Autostart {
         .collect())
     }
 
-    fn execute(entry: &DesktopEntry, desktops: &Vec<String>) -> Result<Child> {
-    
-        let argv = entry.exec_argv();
 
-        if let Err(_) = entry.should_autostart(desktops) {
-            return Err(Error::NotFound)
+    fn is_running(program: &String) -> bool {
+
+        let target = Path::new(program)
+            .file_name()
+            .map(|it| it.to_string_lossy().to_string())
+            .unwrap_or_else(|| program.to_string());
+
+
+        let Ok(entries) = fs::read_dir("/proc") else {
+            return false
+        };
+
+        let me = process::id();
+
+
+        for entry in entries {
+            let Ok(entry) = entry else {
+                continue
+            };
+
+            let Ok(pid) = entry.file_name().to_string_lossy().parse::<u32>() else {
+                continue
+            };
+
+            if pid == me {
+                continue
+            }
+
+            let path = format!("/proc/{pid}/exe");
+            let Ok(path) = fs::read_link(&path) else {
+                continue
+            };
+
+            if let Some(name) = path.file_name() {
+                if name.to_string_lossy() == target {
+                    return true
+                }
+            }
         }
 
+        false
+    }
+
+    fn execute(argv: &[String]) -> Result<Child> {
+    
         let Some((program, args)) = argv.split_first() else {
             return Err(Error::Unhandled("Exec key missing or empty"))
         };
@@ -137,7 +176,7 @@ impl Autostart {
         
         self.data.lock()?.xdg_autostart = Self::read_autostart(XDG_AUTOSTART)?;
         self.data.lock()?.local_autostart = Self::read_autostart(&Data::share().xdg_home_autostart)?;
-    
+
         let data = self.data.clone();
         self.thread.spawn_simple(move || {
 
@@ -153,17 +192,37 @@ impl Autostart {
 
             merge_autostart!(&locale, &mut merge, &xdg_autostart);
             merge_autostart!(&locale, &mut merge, &local_autostart);
+            
+            let keys = &merge.clone().into_keys().collect::<Vec<_>>();
+            let mut keys = keys.clone();
+            keys.sort();
 
             let desktops = current_desktops();
 
             data.lock()?.children.clear();
-            for (name, entry) in merge {                
-                
-                let child = Self::execute(&entry, &desktops);
+            for name in keys {
+                let entry = merge.get(&name.clone()).unwrap();
+
+                let argv = entry.exec_argv();
+
+                let Some((program, argv)) = argv.split_first() else {
+                    continue
+                };
+
+                if let Err(_) = entry.should_autostart(&desktops) {
+                    continue
+                }
+
+                if Self::is_running(&program) {
+                    log.syslog_with_tag(Self::APP_TAG, Priority::LogDebug, &format!("Start: {name} - {:?} - skip (already running)", &entry.exec_argv()));
+                    continue
+                }
+
+                let child = Self::execute(&argv);
                 if let Err(_e  @ Error::NotFound) = child {
                     log.syslog_with_tag(Self::APP_TAG, Priority::LogDebug, &format!("Start: {name} - {:?} - skip", &entry.exec_argv()));
                     continue
-                } if let Err(e) = child {
+                } else if let Err(e) = child {
                     return Err(e)
                 } 
                 log.syslog_with_tag(Self::APP_TAG, Priority::LogDebug, &format!("Start: {name} - {:?} - ok", &entry.exec_argv()));
