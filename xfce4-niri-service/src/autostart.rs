@@ -156,12 +156,12 @@ impl Autostart {
         false
     }
 
-    fn execute(argv: &[String]) -> Result<Child> {
-    
-        let Some((program, args)) = argv.split_first() else {
-            return Err(Error::Unhandled("Exec key missing or empty"))
-        };
+    fn execute(program: &String, args: &[String]) -> Result<Child> {
 
+        let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
+        log.syslog_with_tag(Self::APP_TAG, Priority::LogDebug, &format!("Executing: {program} {:?}", args));
+
+        let program = "ls";
         Command::new(program)
             .args(args)
             .stdin(Stdio::null())
@@ -203,24 +203,34 @@ impl Autostart {
             for name in keys {
                 let entry = merge.get(&name.clone()).unwrap();
 
-                let argv = entry.exec_argv();
+                let args = entry.exec_argv();
 
-                let Some((program, argv)) = argv.split_first() else {
-                    continue
-                };
+                
+
+                let program: String;
+                let argv: Vec<String>;
+                if !args.is_empty() {
+                    let Some((_program, _argv)) = args.split_first() else {
+                        continue
+                    };
+                    program = _program.clone();
+                    argv = _argv.to_owned();
+                } else {
+                    continue;
+                }
 
                 if let Err(_) = entry.should_autostart(&desktops) {
                     continue
                 }
 
                 if Self::is_running(&program) {
-                    log.syslog_with_tag(Self::APP_TAG, Priority::LogDebug, &format!("Start: {name} - {:?} - skip (already running)", &entry.exec_argv()));
+                    log.syslog_with_tag(Self::APP_TAG, Priority::LogInfo, &format!("Start: {name} - {:?} - skip (already running)", &entry.exec_argv()));
                     continue
                 }
 
-                let child = Self::execute(&argv);
+                let child = Self::execute(&program, &argv);
                 if let Err(_e  @ Error::NotFound) = child {
-                    log.syslog_with_tag(Self::APP_TAG, Priority::LogDebug, &format!("Start: {name} - {:?} - skip", &entry.exec_argv()));
+                    log.syslog_with_tag(Self::APP_TAG, Priority::LogInfo, &format!("Start: {name} - {:?} - skip", &entry.exec_argv()));
                     continue
                 } else if let Err(e) = child {
                     return Err(e)

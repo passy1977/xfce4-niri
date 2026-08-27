@@ -229,10 +229,6 @@ impl DesktopEntry {
             return Err("X-GNOME-Autostart-enabled is false")
         }
 
-        if !self.boolean("X-GNOME-Autostart-enabled").unwrap_or(true) {
-            return Err("X-GNOME-Autostart-enabled is false")
-        }
-
         if self.contains_key("RunHook") {
             let run_hook = self.integer("RunHook");
             if run_hook.is_none() {
