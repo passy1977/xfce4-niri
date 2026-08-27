@@ -215,10 +215,6 @@ impl DesktopEntry {
     /// Tells whether this entry has to be launched, or why it has not.
     pub(crate) fn should_autostart(&self, current_desktops: &[String]) -> Result<(), &'static str> {
 
-
-        
-        let show_in_override = self.boolean("X-XFCE-Autostart-Override").unwrap_or(true);
-
         if self.raw("Type") != Some("Application") {
             return Err("Type is not Application")
         }
@@ -229,7 +225,7 @@ impl DesktopEntry {
         }
 
         // Not in the spec, but honoured by Xfce and GNOME alike.
-        if !show_in_override && !self.boolean("X-GNOME-Autostart-enabled").unwrap_or(true) {
+        if !self.boolean("X-XFCE-Autostart-Override").unwrap_or(false) && !self.boolean("X-GNOME-Autostart-enabled").unwrap_or(true) {
             return Err("X-GNOME-Autostart-enabled is false")
         }
 
