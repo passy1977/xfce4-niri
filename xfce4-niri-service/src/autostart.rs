@@ -156,12 +156,11 @@ impl Autostart {
         false
     }
 
-    fn execute(program: &String, args: &[String]) -> Result<Child> {
+    fn exec(program: &String, args: &[String]) -> Result<Child> {
 
         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
         log.syslog_with_tag(Self::APP_TAG, Priority::LogDebug, &format!("Executing: {program} {:?}", args));
 
-        let program = "ls";
         Command::new(program)
             .args(args)
             .stdin(Stdio::null())
@@ -231,7 +230,7 @@ impl Autostart {
                     continue
                 }
 
-                let child = Self::execute(&program, &argv);
+                let child = Self::exec(&program, &argv);
                 if let Err(_e  @ Error::NotFound) = child {
                     log.syslog_with_tag(Self::APP_TAG, Priority::LogInfo, &format!("Start: {name} - {:?} - skip", &entry.exec_argv()));
                     continue
