@@ -92,6 +92,8 @@ impl Gui {
             .model(&model)
             .headers_visible(true)
             .tooltip_column(col::TOOLTIP as i32)
+            .margin_start(12)
+            .margin_end(12)
             .build();
         swin.add(&tree_view);
 
@@ -178,6 +180,7 @@ impl Gui {
 
         let add = button("Add", "list-add-symbolic", "Add application");
         add.connect_clicked(glib::clone!(@weak this => move |_| this.on_menu_add_clicked()));
+        add.set_margin_start(12);
         bbox.pack_start(&add, false, false, 0);
 
         let remove = button("Remove", "list-remove-symbolic", "Remove application");
@@ -186,6 +189,7 @@ impl Gui {
 
         let edit = button("Edit", "document-edit-symbolic", "Edit application");
         edit.connect_clicked(glib::clone!(@weak this => move |_| this.on_button_edit_clicked()));
+        edit.set_margin_end(12);
         bbox.pack_start(&edit, false, false, 0);
 
         selection.connect_changed(glib::clone!(@weak this, @weak remove, @weak edit => move |selection|
@@ -200,6 +204,7 @@ impl Gui {
             .build();
 
         let close = button("Close", "window-close-symbolic", "Close application");
+        close.set_margin_top(12);
         close.connect_clicked(|btn| 
             if let Some(w) = Self::toplevel(btn) {
                 w.close();
