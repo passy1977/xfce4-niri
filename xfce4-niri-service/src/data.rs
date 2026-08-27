@@ -263,10 +263,20 @@ impl Data {
     }
     
     pub(crate) fn acquire_single_instance_lock() -> Result<File> {
-        let dir = env::var("XDG_RUNTIME_DIR")
-            .unwrap_or_else(|_| format!("/tmp/xfce4-niri-{}", unsafe { getuid() }));
-        let lock_file = format!("{dir}/xfce4-niri-service.lock");
+        
 
+        let path = Path::new(
+                &env::var("XDG_RUNTIME_DIR")
+                .unwrap_or_else(|_| format!("/tmp"))
+            )
+            .join(format!("xfce4-niri-{}", unsafe { getuid() }));
+
+        if !path.exists() {
+            fs::create_dir(&path).map_err( |e| Error::UnhandledOwned(e.to_string()))?;
+        }
+
+        let lock_file = path.join("xfce4-niri-service.lock");
+        
         let file = OpenOptions::new().create(true).read(true).write(true).open(&lock_file)
             .map_err(|e| Error::UnhandledOwned(e.to_string()))?;
 
