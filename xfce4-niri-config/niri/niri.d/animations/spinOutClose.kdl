@@ -1,0 +1,25 @@
+// Preset "spinOutClose": only the close animation rotates slightly while
+// disappearing (opening stays the default one).
+animations {
+    slowdown 2.0
+
+    window-close {
+        duration-ms 400
+        curve "linear"
+        custom-shader r"
+            vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+                vec4 color = vec4(0.0);
+                if (0.0 <= coords_geo.x && coords_geo.x <= 1.0 && 0.0 <= coords_geo.y && coords_geo.y <= 1.0) {
+                    vec2 centered = coords_geo.xy - vec2(0.5);
+                    float angle = niri_clamped_progress * 0.5;
+                    mat2 rotation = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+                    vec2 rotated = rotation * centered + vec2(0.5);
+                    if (0.0 <= rotated.x && rotated.x <= 1.0 && 0.0 <= rotated.y && rotated.y <= 1.0) {
+                        color = texture2D(niri_tex, rotated) * (1.0 - niri_clamped_progress);
+                    }
+                }
+                return color;
+            }
+        "
+    }
+}

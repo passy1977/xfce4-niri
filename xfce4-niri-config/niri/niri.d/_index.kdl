@@ -1,0 +1,15 @@
+// niri.d/_index.kdl
+// Aggregates all configuration modules, in load order.
+// Input/output must exist before rules and keybindings that use them.
+
+include "10-inputs.kdl"
+include "20-outputs.kdl"
+include "30-appearance.kdl"
+include "40-rules.kdl"
+include "50-startup.kdl"
+include "60-keys.kdl"
+
+// Active animation preset. Alternatives available in animations/:
+// fall, gentleZoom, rippleFade, topSlide, vortex, spinOutClose,
+// diagonalWipe, circleFadeIn. To switch, replace the name below.
+include "./animations/none.kdl"

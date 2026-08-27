@@ -1,0 +1,7 @@
+// niri.d/20-outputs.kdl
+// Monitors and their resolution/refresh settings.
+// Reference: https://niri-wm.github.io/niri/Configuration:-Outputs
+
+// WARNING
+// The display configuration it's handled by xfce4-display-settings 
+

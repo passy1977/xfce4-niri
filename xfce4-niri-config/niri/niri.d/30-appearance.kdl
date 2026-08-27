@@ -1,0 +1,39 @@
+// niri.d/30-appearance.kdl
+// Gaps, focus ring, borders, shadows.
+// Reference: https://niri-wm.github.io/niri/Configuration:-Layout
+// Animations are in niri.d/animations/ (included from _index.kdl).
+
+layout {
+    gaps 4
+
+    // center-focused-column "never"
+    center-focused-column "on-overflow"
+
+    preset-column-widths {
+        proportion 0.33333
+        proportion 0.5
+        proportion 0.66667
+    }
+
+    default-column-width { proportion 0.5; }
+
+    border {
+        off
+    }
+
+    focus-ring {
+        off
+    }
+
+    shadow {
+        off
+    }
+
+
+    struts {
+        // left 64
+        // right 64
+        // top 64
+        // bottom 64
+    }
+}

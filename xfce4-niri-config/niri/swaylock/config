@@ -1,0 +1,71 @@
+# niri/swaylock/config
+# swaylock appearance, kept coherent with the XFCE4 "Minimal-Light" theme:
+# https://github.com/passy1977/XFCE4-theme-Minimal-Light
+#
+# Palette pulled straight from the theme's own sources so the lock screen
+# reads as part of the same desktop rather than a generic swaylock default:
+#   themes/Minimal-Light/gtk-2.0/gtkrc
+#     base/surface (white)      #ffffff
+#     bg                        #f5f6f7
+#     text/fg                   #111521
+#     accent (selected/link)    #5294e2
+#     insensitive fg / bg       #a9acb2 / #fbfcfc
+#   themes/Minimal-Light/xfwm4/themerc
+#     active window title text  #333333
+#   niri.d/30-appearance.kdl (this host's border urgent-color, reused here
+#   so "wrong password" red matches "urgent window" red elsewhere in niri)
+#     urgent                    #9b0000
+#
+# Invoked via `swaylock -C ~/.config/niri/swaylock/config`
+# (see niri.d/60-keys.kdl) since this file does not live at swaylock's
+# default XDG config path.
+
+# Same wallpaper as swaybg (niri.d/50-startup.kdl) for a consistent look
+# between desktop and lock screen. #f5f6f7 is the theme's bg_color, used
+# as a fallback fill if the image cannot be loaded.
+image=/usr/local/share/backgrounds/002.jpg
+scaling=fill
+color=#f5f6f7
+
+# Matches the theme's xsettings.xml FontName ("DejaVu Sans Ultra-Light 11").
+font=DejaVu Sans ExtraLight
+font-size=28
+
+indicator-radius=110
+indicator-thickness=4
+line-uses-inside
+
+# Detach from the controlling terminal/spawning process once locked, so
+# the niri "spawn" call that launches swaylock returns immediately.
+daemonize
+
+show-failed-attempts
+indicator-caps-lock
+
+# Idle / default indicator state
+ring-color=#d5d8dc
+ring-clear-color=#d5d8dc
+inside-color=#ffffffcc
+inside-clear-color=#ffffffcc
+text-color=#111521
+text-clear-color=#111521
+separator-color=#d5d8dc
+
+# Typing feedback: accent blue for keys, urgent red for backspace
+key-hl-color=#5294e2
+bs-hl-color=#9b0000
+
+# Verifying (checking password) — theme's selected_bg/selected_fg pair
+ring-ver-color=#5294e2cc
+inside-ver-color=#d5d8dc
+text-ver-color=#111521
+
+# Wrong password — matches niri's urgent-color
+ring-wrong-color=#9b0000
+inside-wrong-color=#9b0000cc
+text-wrong-color=#ffffff
+
+# Caps Lock indicator state — muted, not alarming
+ring-caps-lock-color=#a9acb2
+inside-caps-lock-color=#fbfcfccc
+text-caps-lock-color=#111521

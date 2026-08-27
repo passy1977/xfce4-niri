@@ -1,0 +1,26 @@
+// niri config - entry point.
+// The configuration is split into modules under niri.d/, following
+// the structure used in https://gitlab.com/jped/niri (repo README):
+// this file remains the entry point with global/environment settings,
+// while input, output, appearance, rules, startup and keybindings each
+// live in their own numbered module.
+//
+// KDL format: https://kdl.dev
+// Full guide: https://niri-wm.github.io/niri/Configuration:-Introduction
+
+include "niri.d/_index.kdl"
+
+// XDG_CURRENT_DESKTOP="niri" makes xdg-desktop-portal pick
+// ~/.config/xdg-desktop-portal/niri-portals.conf (see niri.d/50-startup.kdl
+// for starting the portal and the XFCE components).
+environment {
+    XDG_CURRENT_DESKTOP "niri,xfce4"
+}
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+// prefer-no-csd
+
+screenshot-path "~/Desktop/Screenshot from %Y-%m-%d %H-%M-%S.png"

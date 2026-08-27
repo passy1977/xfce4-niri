@@ -1,0 +1,64 @@
+// niri.d/40-rules.kdl
+// Rules for specific windows.
+// Reference: https://niri-wm.github.io/niri/Configuration:-Window-Rules
+
+// Open LibreWolf's Picture-in-Picture player as a floating window.
+window-rule {
+    match app-id=r#"librewolf$"# title="^Picture-in-Picture$"
+    open-floating true
+}
+
+// Open XFCE4 App Finder as a floating window.
+window-rule {
+    match app-id=r#"^xfce4-appfinder$"#
+    open-floating true
+}
+
+window-rule {
+    match app-id=r#"^Calculator$"#
+    open-floating true
+}
+
+// Thunar's file transfer/progress popup as a floating window
+// (matched by title too, so the main file manager window stays tiled).
+window-rule {
+    match app-id=r#"^Thunar$"# title=r#"^File Operation Progress$"#
+    open-floating true
+}
+
+window-rule {
+    match app-id=r#"^Visual Studio Code (on dev)$"# title=r#"^Open Folder$"#
+    open-floating true
+}
+
+// Blueman Bluetooth manager as a floating window.
+window-rule {
+    match app-id=r#"^blueman-manager$"#
+    open-floating true
+}
+
+// Vorta (Borg backup client) as a floating window.
+window-rule {
+    match app-id=r#"^com\.borgbase\.Vorta$"#
+    open-floating true
+}
+
+// NetworkManager connection editor as a floating window.
+window-rule {
+    match app-id=r#"^nm-connection-editor$"#
+    open-floating true
+}
+
+
+// Example: exclude password managers from screen sharing.
+/-window-rule {
+    match app-id=r#"^org\.keepassxc\.KeePassXC$"#
+    match app-id=r#"^org\.gnome\.World\.Secrets$"#
+    block-out-from "screen-capture"
+}
+
+// Example: rounded corners for all windows.
+/-window-rule {
+    geometry-corner-radius 12
+    clip-to-geometry true
+}

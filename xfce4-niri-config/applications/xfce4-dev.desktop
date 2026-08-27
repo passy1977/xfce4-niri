@@ -1,0 +1,17 @@
+[Desktop Entry]
+Name=Xfce4-dev
+GenericName=Terminal entering Xfce4-dev
+Comment=Terminal entering Xfce4-dev
+Categories=Distrobox;System;Utility
+Exec=/home/antoniosalsi/.local/bin/distrobox enter  xfce4-dev
+Icon=/home/antoniosalsi/.local/share/icons/distrobox/debian.png
+Keywords=distrobox;
+NoDisplay=false
+Terminal=true
+TryExec=/home/antoniosalsi/.local/bin/distrobox
+Type=Application
+Actions=Remove;
+
+[Desktop Action Remove]
+Name=Remove Xfce4-dev from system
+Exec=/home/antoniosalsi/.local/bin/distrobox rm  xfce4-dev

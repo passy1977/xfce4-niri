@@ -1,0 +1,26 @@
+// niri.d/50-startup.kdl
+// Programs started when niri starts.
+//
+// The system uses runit (not systemd): niri does not process
+// /etc/xdg/autostart/*.desktop automatically, so desktop components
+// must be started explicitly here.
+//
+// Wayland status checked at:
+// https://wiki.xfce.org/releng/wayland_roadmap#component_specific_status
+
+
+// --- D-Bus activation environment ---
+// Propagates DISPLAY and XAUTHORITY (Xwayland) into the D-Bus session
+// activation environment, so services started on-demand via D-Bus (portal,
+// polkit agent, etc.) can see them. Runs first so everything below benefits.
+spawn-at-startup "dbus-update-activation-environment" "DISPLAY" "WAYLAND_DISPLAY" "XAUTHORITY"
+
+spawn-at-startup "xfsettingsd"          // xfce4-settings: Yes - theme, cursor, font
+spawn-at-startup "xfce4-power-manager"  // Yes - battery/backlight
+spawn-at-startup "xfce4-panel"          // Yes - panel/taskbar (layer-shell)
+spawn-at-startup "Thunar" "--daemon"    // Yes - file manager, background service
+spawn-at-startup "alacritty" "--daemon" // Start terminal emulator daemon
+
+spawn-at-startup "swaybg" "-i" "/usr/local/share/backgrounds/001.jpg" "-m" "fill" "-c" "#f5f6f7"
+
+spawn-at-startup "xfce4-niri-service"

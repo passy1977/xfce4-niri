@@ -1,0 +1,20 @@
+#!/bin/bash
+
+for cmd in swayidle swaylock; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo "Error: '$cmd' is not installed or not in PATH." >&2
+        exit 1
+    fi
+done
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Error: missing arguments. Usage: $(basename "$0") <lock_timeout> <screen_off_timeout>" >&2
+    exit 1
+fi
+
+swayidle -w \
+    timeout $1 "swaylock -C ~/.config/niri/swaylock/config" \
+    timeout $2 "niri msg action power-off-monitors" \
+    resume "niri msg action power-on-monitors" &
+
+sleep 1

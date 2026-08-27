@@ -1,0 +1,5 @@
+// Preset "stock": just a global slowdown, no custom shaders.
+// Default preset, the lightest and safest.
+animations {
+    slowdown 2.0
+}
