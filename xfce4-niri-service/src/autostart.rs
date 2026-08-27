@@ -211,15 +211,18 @@ impl Autostart {
                 let argv: Vec<String>;
                 if !args.is_empty() {
                     let Some((_program, _argv)) = args.split_first() else {
+                        log.syslog_with_tag(Self::APP_TAG, Priority::LogDebug, &format!("Start: {name} - {:?} - skip (fail to split)", &entry.exec_argv()));
                         continue
                     };
                     program = _program.clone();
                     argv = _argv.to_owned();
                 } else {
+                    log.syslog_with_tag(Self::APP_TAG, Priority::LogDebug, &format!("Start: {name} - skip (args empty)"));
                     continue;
                 }
 
                 if let Err(_) = entry.should_autostart(&desktops) {
+                    log.syslog_with_tag(Self::APP_TAG, Priority::LogDebug, &format!("Start: {name} - skip (autostart not enable)"));
                     continue
                 }
 

@@ -21,6 +21,7 @@
 #![cfg(not(feature = "disable_autostart"))]
 #![allow(dead_code)]
 
+use std::str::FromStr;
 use std::{collections::HashMap};
 use std::env;
 use std::fs::read_to_string;
@@ -241,12 +242,18 @@ impl DesktopEntry {
             }
         }
 
+        let current_desktops: Vec<_> = current_desktops
+            .to_owned()
+            .iter()
+            .map(|it| it.to_lowercase() )
+            .collect();
+
         let only_show_in = self.list("OnlyShowIn");
-        if !only_show_in.is_empty() && !only_show_in.iter().any(|it| current_desktops.contains(it)) {
+        if !only_show_in.is_empty() && !only_show_in.iter().any(|it| current_desktops.contains(&it.to_lowercase())) {
             return Err("OnlyShowIn does not match the current desktop")
         }
 
-        if self.list("NotShowIn").iter().any(|it| current_desktops.contains(it)) {
+        if self.list("NotShowIn").iter().any(|it| current_desktops.contains(&it.to_lowercase())) {
             return Err("NotShowIn matches the current desktop")
         }
 
