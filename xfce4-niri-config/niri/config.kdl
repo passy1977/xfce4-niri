@@ -14,7 +14,7 @@ include "niri.d/_index.kdl"
 // ~/.config/xdg-desktop-portal/niri-portals.conf (see niri.d/50-startup.kdl
 // for starting the portal and the XFCE components).
 environment {
-    XDG_CURRENT_DESKTOP "niri,xfce4"
+    XDG_CURRENT_DESKTOP "niri:XFCE"
 }
 
 hotkey-overlay {
