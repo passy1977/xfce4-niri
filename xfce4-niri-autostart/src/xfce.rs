@@ -18,8 +18,6 @@
  *
  ***************************************************************************/
 
-#![allow(dead_code)]
-
 /// Safe wrappers around xfce4util/xfce4ui
 
 use std::ffi::{CStr, CString, OsStr, c_char};
@@ -88,7 +86,7 @@ mod ffi {
 
             pub(in crate::xfce) fn xfce_rc_rollback(rc: *mut XfceRc);
 
-            pub(in crate::xfce) fn xfce_rc_is_dirty(rc: *const XfceRc) -> gboolean;
+            // pub(in crate::xfce) fn xfce_rc_is_dirty(rc: *const XfceRc) -> gboolean;
 
             pub(in crate::xfce) fn xfce_rc_is_readonly(rc: *const XfceRc) -> gboolean;
 
@@ -120,17 +118,17 @@ mod ffi {
 
             pub(in crate::xfce) fn xfce_rc_write_bool_entry(rc: *mut XfceRc, key: *const c_char, value: gboolean);
 
-            /// `value` is a `NULL` terminated `gchar **`, only read.
-            pub(in crate::xfce) fn xfce_rc_write_list_entry(
-                rc: *mut XfceRc,
-                key: *const c_char,
-                value: *mut *mut c_char,
-                separator: *const c_char,
-            );
+            // /// `value` is a `NULL` terminated `gchar **`, only read.
+            // pub(in crate::xfce) fn xfce_rc_write_list_entry(
+            //     rc: *mut XfceRc,
+            //     key: *const c_char,
+            //     value: *mut *mut c_char,
+            //     separator: *const c_char,
+            // );
 
-            pub(in crate::xfce) fn xfce_rc_delete_entry(rc: *mut XfceRc, key: *const c_char, global: gboolean);
+            // pub(in crate::xfce) fn xfce_rc_delete_entry(rc: *mut XfceRc, key: *const c_char, global: gboolean);
 
-            pub(in crate::xfce) fn xfce_rc_delete_group(rc: *mut XfceRc, group: *const c_char, global: gboolean);
+            // pub(in crate::xfce) fn xfce_rc_delete_group(rc: *mut XfceRc, group: *const c_char, global: gboolean);
         }
 
     }
@@ -324,10 +322,10 @@ impl Rc {
         unsafe { xfce4util::xfce_rc_is_readonly(self.0) != GFALSE }
     }
 
-    /// `xfce_rc_is_dirty (rc)`: written, not on disk yet.
-    pub(crate) fn is_dirty(&self) -> bool {
-        unsafe { xfce4util::xfce_rc_is_dirty(self.0) != GFALSE }
-    }
+    // /// `xfce_rc_is_dirty (rc)`: written, not on disk yet.
+    // pub(crate) fn is_dirty(&self) -> bool {
+    //     unsafe { xfce4util::xfce_rc_is_dirty(self.0) != GFALSE }
+    // }
 
     /// `xfce_rc_read_entry (rc, key, NULL)`, copied out of the library.
     pub(crate) fn read_entry(&self, key: &CStr) -> Option<String> {
@@ -394,55 +392,55 @@ impl Rc {
         true
     }
 
-    /// `xfce_rc_write_list_entry (rc, key, values, ";")`, the counterpart of
-    /// [`read_list_entry`](Self::read_list_entry). Joined, so without the
-    /// trailing `;` the spec makes optional.
-    pub(crate) fn write_list_entry<S: AsRef<str>>(&self, key: &CStr, values: &[S]) -> bool {
+    // /// `xfce_rc_write_list_entry (rc, key, values, ";")`, the counterpart of
+    // /// [`read_list_entry`](Self::read_list_entry). Joined, so without the
+    // /// trailing `;` the spec makes optional.
+    // pub(crate) fn write_list_entry<S: AsRef<str>>(&self, key: &CStr, values: &[S]) -> bool {
 
-        let Ok(values) = values.iter().map(|it| CString::new(it.as_ref())).collect::<Result<Vec<_>, _>>()
-        else {
-            return false
-        };
+    //     let Ok(values) = values.iter().map(|it| CString::new(it.as_ref())).collect::<Result<Vec<_>, _>>()
+    //     else {
+    //         return false
+    //     };
 
-        if self.is_readonly() {
-            return false
-        }
+    //     if self.is_readonly() {
+    //         return false
+    //     }
 
-        // `NULL` terminated, borrowed from the `CString`s for the call only.
-        let mut strv: Vec<*mut c_char> = values.iter().map(|it| it.as_ptr().cast_mut()).collect();
-        strv.push(ptr::null_mut());
+    //     // `NULL` terminated, borrowed from the `CString`s for the call only.
+    //     let mut strv: Vec<*mut c_char> = values.iter().map(|it| it.as_ptr().cast_mut()).collect();
+    //     strv.push(ptr::null_mut());
 
-        unsafe {
-            xfce4util::xfce_rc_write_list_entry(self.0, key.as_ptr(), strv.as_mut_ptr(), c";".as_ptr())
-        };
+    //     unsafe {
+    //         xfce4util::xfce_rc_write_list_entry(self.0, key.as_ptr(), strv.as_mut_ptr(), c";".as_ptr())
+    //     };
 
-        true
-    }
+    //     true
+    // }
 
-    /// `xfce_rc_delete_entry (rc, key, global)`, `global` for every file
-    /// behind the view.
-    pub(crate) fn delete_entry(&self, key: &CStr, global: bool) -> bool {
+    // /// `xfce_rc_delete_entry (rc, key, global)`, `global` for every file
+    // /// behind the view.
+    // pub(crate) fn delete_entry(&self, key: &CStr, global: bool) -> bool {
 
-        if self.is_readonly() {
-            return false
-        }
+    //     if self.is_readonly() {
+    //         return false
+    //     }
 
-        unsafe { xfce4util::xfce_rc_delete_entry(self.0, key.as_ptr(), glib_bool(global)) };
+    //     unsafe { xfce4util::xfce_rc_delete_entry(self.0, key.as_ptr(), glib_bool(global)) };
 
-        true
-    }
+    //     true
+    // }
 
-    /// `xfce_rc_delete_group (rc, group, global)`.
-    pub(crate) fn delete_group(&self, group: &CStr, global: bool) -> bool {
+    // /// `xfce_rc_delete_group (rc, group, global)`.
+    // pub(crate) fn delete_group(&self, group: &CStr, global: bool) -> bool {
 
-        if self.is_readonly() {
-            return false
-        }
+    //     if self.is_readonly() {
+    //         return false
+    //     }
 
-        unsafe { xfce4util::xfce_rc_delete_group(self.0, group.as_ptr(), glib_bool(global)) };
+    //     unsafe { xfce4util::xfce_rc_delete_group(self.0, group.as_ptr(), glib_bool(global)) };
 
-        true
-    }
+    //     true
+    // }
 
     /// `xfce_rc_flush (rc)`: the pending writes onto disk, view kept open.
     pub(crate) fn flush(&self) {
