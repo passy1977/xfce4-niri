@@ -28,7 +28,8 @@ mod lock_screen;
 //mod syslog;
 
 extern crate osal_rs;
-extern crate xfce4_niri_lib;
+
+use xfce4_niri_lib::lock::Lock;
 
 use std::{error::Error, ffi::c_int};
 
@@ -47,7 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
-    let _ = match Data::acquire_single_instance_lock() {
+    let _ = match Lock::acquire(None) {
         Ok(lock) => lock,
         Err(e) => {
             let msg = e.to_string();

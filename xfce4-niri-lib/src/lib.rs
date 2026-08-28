@@ -19,7 +19,9 @@
  ***************************************************************************/
 
 pub mod models;
+pub mod lock;
 pub mod niri;
+pub mod socket;
 pub mod syslog;
 
 #[cfg(any(test, feature = "test-support"))]
@@ -29,6 +31,7 @@ use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use std::process::Command;
 use std::{env, fs};
 
 fn is_program(path: impl AsRef<Path>) -> bool {
@@ -69,6 +72,16 @@ pub fn binary_exists(binary: &str) -> bool {
         .any(|dir| is_program(dir.join(program)))
 }
 
+
+pub fn current_uid() -> u32 {
+    Command::new("id")
+        .arg("-u")
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0)
+}
 
 #[cfg(test)]
 mod tests {

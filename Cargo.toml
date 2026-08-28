@@ -7,6 +7,33 @@ members = [
     "xfce4-niri-lib"
 ]
 
+[package]
+name = "xfce4-niri"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85.0"
+authors = ["Antonio Salsi"]
+description = "Utility to better integrate Xfce4 applications with the WM niri"
+license = "LGPL-2.1-or-later"
+repository = "https://github.com/passy1977/xfce4-niri"
+homepage = "https://github.com/passy1977/xfce4-niri"
+documentation = "https://docs.rs/xfce4-niri"
+readme = "README.md"
+keywords = ["niri", "xfce4", "embedded", "posix"]
+
+exclude = [
+    "target/",
+    ".git/",
+    ".github/",
+    "*.swp",
+    "*.swo",
+]
+
+
+
+[dependencies]
+xfce4-niri-lib = { version = "0", path = "xfce4-niri-lib" }
+osal-rs = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["posix"]}
 
 [profile.release]
 codegen-units = 1 # better optimizations

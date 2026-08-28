@@ -19,3 +19,4 @@ test-support = []
 
 [dependencies]
 glib = "0.18"
+osal-rs = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["posix"]}

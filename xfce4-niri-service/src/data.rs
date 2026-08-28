@@ -18,9 +18,8 @@
  *
  ***************************************************************************/
 
-use std::fs::{DirEntry, File, OpenOptions};
+use std::fs::{DirEntry, File};
 use std::io::{Read, Write};
-use std::os::fd::AsRawFd;
 use std::os::unix::fs::PermissionsExt;
 use std::{fs, path::Path};
 use std::env;
@@ -31,14 +30,8 @@ use osal_rs::utils::{Error, Result};
 use osal_rs_serde::{Deserialize, Serialize};
 
 use crate::brightness::BrightnessData;
-use crate::data::ffi::getuid;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
-mod ffi {
-    use std::ffi::{c_int, c_uint};
-    unsafe extern "C" { pub(super) fn flock(fd: c_int, operation: c_int) -> c_int; }
-    unsafe extern "C" { pub(super) fn getuid() -> c_uint; }
-}
 
 static mut DATA: Option<Data> = None;
 pub(crate) const XDG_AUTOSTART: &str = "/etc/xdg/autostart";
@@ -70,9 +63,6 @@ impl Data {
 
     const APP_TAG: &str = "Data";
     const IO_BUFFER_SIZE: usize = 256;
-
-    const LOCK_EX: c_int = 2;
-    const LOCK_NB: c_int = 4;
 
     pub(crate) fn share() -> &'static Self {
 
@@ -262,40 +252,4 @@ impl Data {
         Self::read_file::<BrightnessData>(&self.brightness_file)
     }
     
-    pub(crate) fn acquire_single_instance_lock() -> Result<File> {
-        
-
-        let path = Path::new(
-                &env::var("XDG_RUNTIME_DIR")
-                .unwrap_or_else(|_| format!("/tmp"))
-            )
-            .join(format!("xfce4-niri-{}", unsafe { getuid() }));
-
-        if !path.exists() {
-            fs::create_dir(&path).map_err( |e| Error::UnhandledOwned(e.to_string()))?;
-        }
-
-        let lock_file = path.join("xfce4-niri-service.lock");
-        
-        let file = OpenOptions::new().create(true).read(true).write(true).open(&lock_file)
-            .map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-
-        if unsafe { ffi::flock(file.as_raw_fd(), Self::LOCK_EX | Self::LOCK_NB) } != 0 {
-            return Err(Error::UnhandledOwned("another instance is already running".into()));
-        }
-
-        Ok(file)
-    }
-
-}
-
-impl Drop for Data {
-    fn drop(&mut self) {
-
-        let dir = env::var("XDG_RUNTIME_DIR")
-            .unwrap_or_else(|_| format!("/tmp/xfce4-niri-{}", unsafe { getuid() }));
-        let path = format!("{dir}/xfce4-niri-service.lock");
-
-        let _ = fs::remove_file(path);
-    }
 }
