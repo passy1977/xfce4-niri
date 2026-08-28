@@ -277,17 +277,6 @@ impl LockScreen {
     }
 
     fn execute_lock_screen_command(data: &LockScreenData) -> Result<Child> {
-        // if data.is_desktop && data.dpms_on_ac_sleep == 0 {
-        //     return Ok(());
-        // } 
-
-        // if !data.is_desktop {
-        //    if data.battery_or_ac && data.dpms_on_ac_off == 0 {
-        //         return Ok(());
-        //     } else if !data.battery_or_ac && data.dpms_on_battery_off == 0 {
-        //         return Ok(());
-        //     }
-        // }
 
         let mut sleep_in_minutes =  if data.is_desktop {
 

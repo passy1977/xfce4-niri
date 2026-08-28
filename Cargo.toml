@@ -34,6 +34,7 @@ exclude = [
 [dependencies]
 xfce4-niri-lib = { version = "0", path = "xfce4-niri-lib" }
 osal-rs = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["posix"]}
+lexopt = "0.3"
 
 [profile.release]
 codegen-units = 1 # better optimizations

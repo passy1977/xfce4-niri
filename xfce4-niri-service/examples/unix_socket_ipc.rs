@@ -206,7 +206,7 @@ fn run_server() -> io::Result<()> {
             break;
         }
 
-        let stream = match stream {
+        let stream:  = match stream {
             Ok(stream) => stream,
             // A client that vanished between connect() and accept() is normal
             // traffic, not a reason to tear the server down.
