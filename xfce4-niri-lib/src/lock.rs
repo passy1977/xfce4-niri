@@ -37,6 +37,8 @@ impl Lock {
 
     const LOCK_EX: c_int = 2;
     const LOCK_NB: c_int = 4;
+    
+    pub const LOCK_FILE: &str = "xfce4-niri-service.lock";
 
     pub fn get_path(file_name: Option<&str>) -> Result<PathBuf> {
         let path = Path::new(
@@ -49,22 +51,11 @@ impl Lock {
             fs::create_dir(&path).map_err( |e| Error::UnhandledOwned(e.to_string()))?;
         }
 
-        Ok(path.join(file_name.unwrap_or("xfce4-niri-service.lock")))
+        Ok(path.join(file_name.unwrap_or(Self::LOCK_FILE)))
     }
 
     pub fn acquire(file_name: Option<&str>) -> Result<Self> {
         
-
-        let path = Path::new(
-                &env::var("XDG_RUNTIME_DIR")
-                .unwrap_or_else(|_| format!("/tmp"))
-            )
-            .join(format!("xfce4-niri-{}", crate::current_uid() ));
-
-        if !path.exists() {
-            fs::create_dir(&path).map_err( |e| Error::UnhandledOwned(e.to_string()))?;
-        }
-
         let lock_file = Self::get_path(file_name)?;
         
         let file = OpenOptions::new().create(true).read(true).write(true).open(&lock_file)
@@ -76,7 +67,7 @@ impl Lock {
 
         Ok(
             Self(
-                String::from(file_name.unwrap_or("xfce4-niri-service.lock"))
+                String::from(file_name.unwrap_or(Self::LOCK_FILE))
             )
         )
     }
