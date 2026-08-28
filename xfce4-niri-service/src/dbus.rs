@@ -35,7 +35,7 @@ use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 macro_rules! handle_power_source_error {
     ($msg:expr) => {{
         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
-        log.syslog(Priority::LogWarning, $msg);
+        log.syslog(Self::APP_TAG, Priority::LogWarning, $msg);
         Error::UnhandledOwned($msg.to_string())
     }};
 }
@@ -86,6 +86,8 @@ pub(crate) struct DBus {
 }
 
  impl DBus {
+
+    const APP_TAG: &str = "DBus";
 
     const TIMEOUT: Duration = Duration::from_millis(5000);
     const DEST: &str = "org.xfce.Xfconf";
@@ -253,7 +255,7 @@ pub(crate) struct DBus {
                 let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
                 loop {
                     if let Err(e) = conn.process(Self::TIMEOUT) {
-                        log.syslog(Priority::LogWarning, &format!("DBus process error: {e}"));
+                        log.syslog(Self::APP_TAG, Priority::LogWarning, &format!("DBus process error: {e}"));
                     }
                 }
             })?;
@@ -264,7 +266,7 @@ pub(crate) struct DBus {
                 let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
                 loop {
                     if let Err(e) = upower_conn.process(Self::TIMEOUT) {
-                        log.syslog(Priority::LogWarning, &format!("UPower process error: {e}"));
+                        log.syslog(Self::APP_TAG, Priority::LogWarning, &format!("UPower process error: {e}"));
                     }
                 }
             })?;

@@ -62,6 +62,7 @@ pub(crate) struct Data {
 impl Data {
 
     const APP_TAG: &str = "Data";
+
     const IO_BUFFER_SIZE: usize = 256;
 
     pub(crate) fn share() -> &'static Self {
@@ -81,7 +82,7 @@ impl Data {
 
                         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
-                        log.syslog(Priority::LogCrit, error);
+                        log.syslog(Self::APP_TAG, Priority::LogCrit, error);
 
                         panic!("{error}");
                     }

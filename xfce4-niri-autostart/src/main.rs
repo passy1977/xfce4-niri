@@ -49,6 +49,8 @@ use crate::gui::Gui;
 const APP_ID: &str = "it.salsi.xfce-niri.AutoStart";
 const APP_NAME_FALLBACK: &str = "Xfce4 niri Autostart";
 
+const APP_TAG: &str = "Xfce4NiriAutostart";
+
 fn main() -> Result<(), Box<dyn Error>> {
 
     let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
@@ -58,16 +60,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(version) => version,
         None => {
             let msg = "Niri not ruining";
-            log.syslog(Priority::LogCrit, &msg);
+            log.syslog(APP_TAG, Priority::LogCrit, &msg);
             return Err(msg.into())
         }
     };
-    log.syslog(Priority::LogDebug, &format!("Version {}", env!("CARGO_PKG_VERSION")));
-    log.syslog(Priority::LogDebug, &format!("Niri {} running", version));
+    log.syslog(APP_TAG, Priority::LogDebug, &format!("Version {}", env!("CARGO_PKG_VERSION")));
+    log.syslog(APP_TAG, Priority::LogDebug, &format!("Niri {} running", version));
 
     if let Err(e) = Data::share().check_persistence() {
         let msg = e.to_string();
-        log.syslog(Priority::LogCrit, &msg);
+        log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into());
     }
 

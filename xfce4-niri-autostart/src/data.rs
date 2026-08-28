@@ -63,7 +63,7 @@ impl Data {
 
                         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
-                        log.syslog(Priority::LogCrit, error);
+                        log.syslog(Self::APP_TAG, Priority::LogCrit, error);
 
                         panic!("{error}");
                     }
