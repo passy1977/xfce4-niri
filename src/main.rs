@@ -24,7 +24,7 @@ use std::error::Error;
 use xfce4_niri_lib::lock::Lock;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
-
+const APP_TAG: &str = "Xfce4Niri";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let log = SysLog::open(Options::LogPid as i32 | Options::LogNDelay as i32); 
@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Ok(lock) => lock,
         Err(e) => {
             let msg = e.to_string();
-            log.syslog(Priority::LogInfo, &msg);
+            log.syslog(APP_TAG, Priority::LogInfo, &msg);
             return Err(msg.into());
         }
     };

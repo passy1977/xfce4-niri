@@ -111,7 +111,7 @@ pub(crate) fn check_persistence(&self) -> Result<(), String> {
                 if mandatory {
                     return Err(error);
                 } else {
-                    log.syslog_with_tag(Self::APP_TAG, Priority::LogInfo, &error);
+                    log.syslog(Self::APP_TAG, Priority::LogInfo, &error);
                 }
             }
         };

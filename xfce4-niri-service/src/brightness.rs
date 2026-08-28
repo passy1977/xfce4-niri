@@ -94,10 +94,10 @@ impl Brightness {
             if data.value > 0 {
                 *current_brightness_ref = data.value;
                 let Err(_) = Self::set_brightness(&brightness_path, data) else {
-                    log.syslog_with_tag(Self::APP_TAG, Priority::LogWarning, &format!("No found device: {}", &brightness_path.to_string_lossy()));
+                    log.syslog(Self::APP_TAG, Priority::LogWarning, &format!("No found device: {}", &brightness_path.to_string_lossy()));
                     return Ok(Arc::new(()))
                 };
-                log.syslog_with_tag(Self::APP_TAG, Priority::LogInfo, &format!("Found device: {}", &brightness_path.to_string_lossy()));
+                log.syslog(Self::APP_TAG, Priority::LogInfo, &format!("Found device: {}", &brightness_path.to_string_lossy()));
             } else {
                 *current_brightness_ref = 0;
                 drop(data)

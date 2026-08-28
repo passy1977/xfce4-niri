@@ -344,7 +344,7 @@ impl LockScreen {
             .spawn()
             .expect("Failed to execute command");
 
-        log.syslog_with_tag(Self::APP_TAG, Priority::LogInfo, &format!("lock screen pid: {}", child.id()));
+        log.syslog(Self::APP_TAG, Priority::LogInfo, &format!("lock screen pid: {}", child.id()));
 
 
         let Ok(exit_status) = child.wait() else {

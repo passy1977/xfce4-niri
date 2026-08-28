@@ -18,7 +18,18 @@
  *
  ***************************************************************************/
 
-use std::ffi::{c_int, CStr, CString};
+use std::ffi::{CString, c_int};
+
+
+pub(super)  mod ffi {
+    use std::ffi::{c_char, c_int};
+
+    unsafe extern "C" {    
+        pub(super)fn openlog(ident: *const c_char, option: c_int, facility: c_int);
+        pub(super)fn syslog(priority: c_int, fmt: *const c_char, ...);
+        pub(super)fn closelog();
+    }
+}
 
 #[allow(unused)]
 pub enum Options {
@@ -45,15 +56,6 @@ pub enum Priority {
     LogDebug = 7
 }
 
-pub(super)  mod ffi {
-    use std::ffi::{c_char, c_int};
-
-    unsafe extern "C" {    
-        pub(super)fn openlog(ident: *const c_char, option: c_int, facility: c_int);
-        pub(super)fn syslog(priority: c_int, fmt: *const c_char, ...);
-        pub(super)fn closelog();
-    }
-}
 
 pub struct SysLog;
 
@@ -65,39 +67,26 @@ impl Drop for SysLog {
 
 impl SysLog {
 
-    const APP_TAG: &CStr = c"SysLog";
-
     pub fn open(option: c_int) -> Self {
         unsafe {
-            ffi::openlog(Self::APP_TAG.as_ptr(), option, Facility::LogUser as c_int);
+            ffi::openlog(c"SysLog".as_ptr(), option, Facility::LogUser as c_int);
         }
         Self
     }
 
-    pub fn syslog(&self, priority: Priority, msg: &str) {
+    pub fn syslog(&self, tag: &str, priority: Priority, msg: &str) {
         let Ok(msg) = CString::new(msg) else {
             return
         };
-        unsafe {
-            ffi::syslog(priority as c_int, c"%s".as_ptr(), msg.as_ptr());
-        }
-    }
 
-    #[allow(dead_code)]
-    pub fn syslog_with_tag(&self, tag: &str, priority: Priority, msg: &str) {
         let Ok(tag) = CString::new(tag) else {
             return
-        }; 
-
-        let Ok(msg) = CString::new(msg) else {
-            return
         };
 
         unsafe {
-            ffi::syslog(priority as c_int, c"%s - %s".as_ptr(), tag.as_ptr(), msg.as_ptr());
+            ffi::syslog(priority as c_int, c"%s: %s".as_ptr(), tag.as_ptr(), msg.as_ptr());
         }
     }
-
 
     pub fn close(&mut self) {
         unsafe {
@@ -110,6 +99,8 @@ impl SysLog {
 #[cfg(test)]
 mod tests {
 
+    const APP_TAG: &str = "SysLog";
+    
     use super::*;
 
     /// The discriminants are handed to `openlog` and `syslog` as they are, so
@@ -141,8 +132,8 @@ mod tests {
 
         let log = SysLog::open(Options::LogPid as c_int | Options::LogCons as c_int);
 
-        log.syslog(Priority::LogDebug, "xfce4-niri-lib test message");
-        log.syslog_with_tag("test", Priority::LogDebug, "xfce4-niri-lib tagged test message");
+        log.syslog(APP_TAG, Priority::LogDebug, "xfce4-niri-lib test message");
+        log.syslog(APP_TAG, Priority::LogDebug, "xfce4-niri-lib tagged test message");
     }
 
     /// A `NUL` cannot be handed to C: the message is dropped instead.
@@ -151,8 +142,8 @@ mod tests {
 
         let log = SysLog::open(Options::LogPid as c_int);
 
-        log.syslog(Priority::LogDebug, "nul\0byte");
-        log.syslog_with_tag("nul\0byte", Priority::LogDebug, "message");
-        log.syslog_with_tag("tag", Priority::LogDebug, "nul\0byte");
+        log.syslog(APP_TAG, Priority::LogDebug, "nul\0byte");
+        log.syslog(APP_TAG, Priority::LogDebug, "message");
+        log.syslog(APP_TAG, Priority::LogDebug, "nul\0byte");
     }
 }

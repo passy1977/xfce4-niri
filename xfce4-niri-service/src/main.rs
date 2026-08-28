@@ -43,6 +43,7 @@ use crate::lock_screen::LockScreen;
 use xfce4_niri_lib::niri::Niri;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
+const APP_TAG: &str = "Xfce4NiriService";
 
 fn main() -> Result<(), Box<dyn Error>> {
 
@@ -52,7 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Ok(lock) => lock,
         Err(e) => {
             let msg = e.to_string();
-            log.syslog(Priority::LogInfo, &msg);
+            log.syslog(APP_TAG, Priority::LogInfo, &msg);
             return Err(msg.into());
         }
     };
@@ -61,17 +62,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(version) => version,
         None => {
             let msg = "Niri not ruining";
-            log.syslog(Priority::LogCrit, &msg);
+            log.syslog(APP_TAG, Priority::LogCrit, &msg);
             return Err(msg.into())
         }
     };
     
-    log.syslog(Priority::LogDebug, &format!("Version {}", env!("CARGO_PKG_VERSION")));
-    log.syslog(Priority::LogDebug, &format!("Niri {} running", version));
+    log.syslog(APP_TAG, Priority::LogDebug, &format!("Version {}", env!("CARGO_PKG_VERSION")));
+    log.syslog(APP_TAG, Priority::LogDebug, &format!("Niri {} running", version));
 
     if let Err(e) = Data::share().check_persistence() {
         let msg = e.to_string();
-        log.syslog(Priority::LogCrit, &msg);
+        log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into());
     }
 
@@ -79,33 +80,33 @@ fn main() -> Result<(), Box<dyn Error>> {
         Ok(dbus) => dbus,
         Err(e) => {
             let msg = e.to_string();
-            log.syslog(Priority::LogCrit, &msg);
+            log.syslog(APP_TAG, Priority::LogCrit, &msg);
             return Err(msg.into());
         },
     };
 
     if let Err(e) = Brightness::new().start() {
         let msg = e.to_string();
-        log.syslog(Priority::LogCrit, &msg);
+        log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into());
     }
 
     if let Err(e) = LockScreen::new().start(&dbus) {
         let msg = e.to_string();
-        log.syslog(Priority::LogCrit, &msg);
+        log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into());
     }
     
     #[cfg(not(feature = "disable_autostart"))]
     if let Err(e) = Autostart::new().start() {
         let msg = e.to_string();
-        log.syslog(Priority::LogCrit, &msg);
+        log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into());
     }
     
     if let Err(e) = dbus.start() {
         let msg = e.to_string();
-        log.syslog(Priority::LogCrit, &msg);
+        log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into());
     }
 
