@@ -18,4 +18,4 @@ keywords = ["niri", "xfce4", "embedded", "posix"]
 test-support = []
 
 [dependencies]
-gtk = { version = "0.18", features = ["v3_24"] }
+glib = "0.18"

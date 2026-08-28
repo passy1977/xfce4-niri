@@ -31,8 +31,6 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::{env, fs};
 
-use gtk::glib;
-
 fn is_program(path: impl AsRef<Path>) -> bool {
 
     let Ok(metadata) = fs::metadata(path) else {
