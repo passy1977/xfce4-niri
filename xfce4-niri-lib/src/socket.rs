@@ -21,7 +21,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixStream, UnixListener};
 use std::path::PathBuf;
-use std::io::ErrorKind;
+use std::io::{BufRead, BufReader, ErrorKind};
 use std::ffi::c_int;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -29,7 +29,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crate::lock::Lock;
 use crate::syslog::{Options, Priority, SysLog};
 
-use osal_rs::os::{Thread, ThreadFn};
+use osal_rs::os::{Mutex, MutexFn, Thread, ThreadFn};
 use osal_rs::utils::{Error, Result};
 
 struct SocketGuard(PathBuf);
@@ -40,7 +40,13 @@ impl Drop for SocketGuard {
     }
 }
 
-pub struct Socket(PathBuf, Thread);
+type OnRequest = Arc<Mutex<dyn Fn(&[String]) + Send + Sync + 'static>>;
+
+pub struct Socket{
+    unix_socket: PathBuf,
+    on_request: OnRequest,
+    thread: Thread
+}
 
 impl Socket {
 
@@ -48,8 +54,12 @@ impl Socket {
 
     pub const LOCK_FILE: &str = Lock::LOCK_FILE;
 
-    pub fn new(unix_socket: PathBuf) -> Self {
-        Socket(unix_socket, Thread::new("lock_screen_thd", 0, 0))
+    pub fn new(unix_socket: PathBuf, on_request: impl Fn(&[String]) + Send + Sync + 'static) -> Self {
+        Socket{
+            unix_socket,
+            on_request: Mutex::new_arc(on_request),
+            thread: Thread::new("lock_screen_thd", 0, 0)
+        }
     }
 
     pub fn start_server(&mut self, socket_file: &str) -> Result<()> {
@@ -60,7 +70,7 @@ impl Socket {
         }
 
         
-        let Some(parent) = self.0.parent() else {
+        let Some(parent) = self.unix_socket.parent() else {
             return Err(Error::UnhandledOwned("invalid socket file path".into()))
         };
 
@@ -108,8 +118,10 @@ impl Socket {
             // One thread per connection keeps the accept loop responsive. For a
             // handful of clients this is cheaper and clearer than an event loop.
             let stream = stream.try_clone();
-            self.1.spawn_simple(move || {
-                if let Err(e) = Self::handle_client(stream.as_ref().unwrap().try_clone().unwrap(), &running) {
+            let on_request = Arc::clone(&self.on_request);
+            self.thread.spawn_simple(move || {
+                let on_request = Arc::clone(&on_request);
+                if let Err(e) = Self::handle_client(stream.as_ref().unwrap().try_clone().unwrap(), &running, on_request) {
                     eprintln!("connection error: {e}");
                 }
 
@@ -122,8 +134,23 @@ impl Socket {
 
 
     
-    fn handle_client(_stream: UnixStream, _running: &Arc<AtomicBool>) -> Result<(), Error<'_>> {
+    fn handle_client(stream: UnixStream, _running: &Arc<AtomicBool>, on_request: OnRequest) -> Result<()> {
         // Handle the client connection here.
+
+        let reader = BufReader::new(stream);
+
+        for line in reader.lines() {
+            let line = line.map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+            let args: Vec<String> = line
+                                        .trim()
+                                        .splitn(3, ' ')
+                                        .map(|s| s.to_string())
+                                        .collect();
+
+            (on_request.lock().unwrap())(&args);
+        }
+
+
         Ok(())
     }
 

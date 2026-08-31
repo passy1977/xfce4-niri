@@ -30,6 +30,7 @@ mod lock_screen;
 extern crate osal_rs;
 
 use xfce4_niri_lib::lock::Lock;
+use xfce4_niri_lib::socket::Socket;
 
 use std::{error::Error, ffi::c_int};
 
@@ -109,6 +110,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into());
     }
+
+    let 
+    if let Err(e) = Socket::new(unix_socket, on_request) {
 
     System::start();
 
