@@ -20,7 +20,7 @@
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixStream, UnixListener};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::io::{BufRead, BufReader, ErrorKind, Write};
 use std::ffi::c_int;
 use std::sync::Arc;
@@ -29,10 +29,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crate::lock::Lock;
 use crate::syslog::{Options, Priority, SysLog};
 
-use osal_rs::os::{Mutex, MutexFn, Thread, ThreadFn};
+use osal_rs::os::{Mutex, MutexFn, Thread, ThreadFn, ThreadState};
 use osal_rs::utils::{Error, Result};
 
 pub type OnRequest = Arc<Mutex<dyn Fn(&[String]) + Send + Sync + 'static>>;
+
+/// Unlinks the socket node when the accept loop that owns it goes away, so the
+/// next start does not find a stale one.
 struct SocketGuard(PathBuf);
 
 impl Drop for SocketGuard {
@@ -44,7 +47,8 @@ impl Drop for SocketGuard {
 pub struct Socket{
     unix_socket: PathBuf,
     on_request: OnRequest,
-    thread: Thread
+    thread: Thread,
+    running: Arc<AtomicBool>
 }
 
 
@@ -52,13 +56,18 @@ impl Socket {
 
     const APP_TAG: &str = "xfce4-niri";
 
+    /// What the server writes back for every line it takes in: `run_client`
+    /// reads one reply per command, so every command has to be answered.
+    const REPLY_OK: &str = "OK";
+
     pub const LOCK_FILE: &str = Lock::LOCK_FILE;
 
     pub fn new(unix_socket: PathBuf) -> Self {
         Socket{
             unix_socket,
             on_request: Mutex::new_arc(|_request: &[String]| {}),
-            thread: Thread::new("lock_screen_thd", 0, 0)
+            thread: Thread::new("socket_srv_thd", 0, 0),
+            running: Arc::new(AtomicBool::new(false))
         }
     }
 
@@ -71,73 +80,118 @@ impl Socket {
             return Err(Error::UnhandledOwned("invalid socket file path".into()))
         };
 
+        fs::create_dir_all(parent).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+
         self.on_request = on_request;
 
         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
-        let mut full_path = PathBuf::from(parent);
-        full_path.push(&self.unix_socket);
+        let path = self.unix_socket.clone();
 
+        Self::remove_stale_socket(&path)?;
 
-        match UnixStream::connect(&full_path) {
-            // Somebody answered: this is a running server, so do not touch it.
-            Ok(_) => Err(Error::UnhandledOwned(format!("a server is already listening on {}", full_path.display()))),
-            // Nobody is listening on it any more - the node is stale.
-            Err(e) if e.kind() == ErrorKind::ConnectionRefused => fs::remove_file(&full_path).map_err(|e| Error::UnhandledOwned(e.to_string())),
-            Err(e) => Err( Error::UnhandledOwned(e.to_string()))
-        }?;
+        let listener = UnixListener::bind(&path).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let guard = SocketGuard(path.clone());
 
-        let listener = UnixListener::bind(&full_path).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-        let _ = SocketGuard(full_path.clone());
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
 
-        // The mode comes from the umask at bind() time, so narrow it now: owner
-        // only. Do it before announcing the socket, not after.
-        fs::set_permissions(&full_path, fs::Permissions::from_mode(0o600)).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        log.syslog(Self::APP_TAG, Priority::LogDebug, &format!("listening on {}", path.display()));
 
-        log.syslog(Self::APP_TAG, Priority::LogDebug, &format!("listening on {}", full_path.display()));
+        self.running.store(true, Ordering::SeqCst);
 
-        let running = Arc::new(AtomicBool::new(true));
+        let running = Arc::clone(&self.running);
+        let on_request = Arc::clone(&self.on_request);
 
-        for stream in listener.incoming() {
-            if !running.load(Ordering::SeqCst) {
-                break;
-            }
+        self.thread.spawn_simple(move || {
 
-            let stream = match stream {
-                Ok(stream) => stream,
-                // A client that vanished between connect() and accept() is normal
-                // traffic, not a reason to tear the server down.
-                Err(e) if e.kind() == ErrorKind::ConnectionAborted => continue,
-                Err(e) => Err( Error::UnhandledOwned(e.to_string()))?
-            };
+            let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
-            // let store = Arc::clone(&store);
-            let running = Arc::clone(&running);
+            let mut connections: Vec<Thread> = Vec::new();
 
-            // One thread per connection keeps the accept loop responsive. For a
-            // handful of clients this is cheaper and clearer than an event loop.
-            let stream = stream.try_clone();
-            let on_request = Arc::clone(&self.on_request);
-            self.thread.spawn_simple(move || {
-                let on_request = Arc::clone(&on_request);
-                if let Err(e) = Self::handle_client(stream.as_ref().unwrap().try_clone().unwrap(), &running, on_request) {
-                    eprintln!("connection error: {e}");
+            for stream in listener.incoming() {
+                if !running.load(Ordering::SeqCst) {
+                    break;
                 }
 
-                Ok(Arc::new(()))
-            })?;
-        }
+                connections.retain(|connection| {
+                    if Thread::get_metadata(connection).state == ThreadState::Deleted {
+                        connection.delete();
+                        false
+                    } else {
+                        true
+                    }
+                });
+
+                let stream = match stream {
+                    Ok(stream) => stream,
+                    // A client that vanished between connect() and accept() is normal
+                    // traffic, not a reason to tear the server down.
+                    Err(e) if e.kind() == ErrorKind::ConnectionAborted => continue,
+                    Err(e) => {
+                        log.syslog(Self::APP_TAG, Priority::LogErr, &format!("accept failed: {e}"));
+                        break;
+                    }
+                };
+
+                let on_request = Arc::clone(&on_request);
+                let mut connection = Thread::new("socket_cli_thd", 0, 0);
+
+                connections.push(connection.spawn_simple(move || {
+
+                    if let Err(e) = Self::handle_client(&stream, &on_request) {
+                        let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
+                        log.syslog(Self::APP_TAG, Priority::LogErr, &format!("connection error: {e}"));
+                    }
+
+                    Ok(Arc::new(()))
+                })?);
+            }
+
+            // Dropping the guard here, on the way out, is what unlinks the node.
+            log.syslog(Self::APP_TAG, Priority::LogDebug, &format!("stopped listening on {}", guard.0.display()));
+
+            Ok(Arc::new(()))
+        })?;
 
         Ok(())
     }
 
+    /// Stops the accept loop [`Socket::start_server`] left running. `accept()`
+    /// blocks, so the flag on its own is not enough: a throwaway connection
+    /// pokes the listener into coming back around and noticing it.
+    pub fn stop(&self) {
+        if !self.running.swap(false, Ordering::SeqCst) {
+            return;
+        }
 
-    
-    fn handle_client(stream: UnixStream, _running: &Arc<AtomicBool>, on_request: OnRequest) -> Result<()> {
-        // Handle the client connection here.
+        let _ = UnixStream::connect(&self.unix_socket);
+    }
 
+    /// Decides whether an existing socket node belongs to a live server or is
+    /// leftover from one that died.
+    fn remove_stale_socket(path: &Path) -> Result<()> {
+        if !path.exists() {
+            // Nothing to clean up: this is the ordinary first start.
+            return Ok(())
+        }
+
+        match UnixStream::connect(path) {
+            // Somebody answered: this is a running server, so do not touch it.
+            Ok(_) => Err(Error::UnhandledOwned(format!("a server is already listening on {}", path.display()))),
+            // Nobody is listening on it any more - the node is stale.
+            Err(e) if e.kind() == ErrorKind::ConnectionRefused => fs::remove_file(path).map_err(|e| Error::UnhandledOwned(e.to_string())),
+            Err(e) => Err( Error::UnhandledOwned(e.to_string()))
+        }
+    }
+
+    fn handle_client(stream: &UnixStream, on_request: &OnRequest) -> Result<()> {
+
+        // Reading and writing side both borrow the same fd: `&UnixStream` is
+        // itself `Read` and `Write`, so there is nothing to dup.
+        let mut writer = stream;
         let reader = BufReader::new(stream);
 
+        // lines() ends on EOF, which is what a client dropping its end looks like.
         for line in reader.lines() {
             let line = line.map_err(|e| Error::UnhandledOwned(e.to_string()))?;
             let args: Vec<String> = line
@@ -146,7 +200,17 @@ impl Socket {
                                         .map(|s| s.to_string())
                                         .collect();
 
-            (on_request.lock().unwrap())(&args);
+            let Ok(callback) = on_request.lock() else {
+                return Err(Error::Unhandled("failed to take the request callback"))
+            };
+
+            callback(&args);
+            drop(callback);
+
+            // The client reads one line back per command it wrote: with no
+            // answer it would sit on read_line() until the service goes away.
+            writeln!(writer, "{}", Self::REPLY_OK).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+            writer.flush().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
         }
 
 
@@ -159,7 +223,8 @@ impl Socket {
             return Err(Error::UnhandledOwned("fxce4-niri-service seems down".into()))
         }
 
-        let stream = UnixStream::connect(&self.unix_socket).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let stream = UnixStream::connect(&self.unix_socket)
+            .map_err(|e| Error::UnhandledOwned(format!("cannot connect to {}: {e} (is the service running?)", self.unix_socket.display())))?;
 
         let mut writer = stream.try_clone().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
         let mut reader = BufReader::new(stream);

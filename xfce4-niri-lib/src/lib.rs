@@ -88,11 +88,16 @@ pub fn current_uid() -> u32 {
 }
 
 pub fn get_safe_path(file_name: Option<&str>) -> Result<PathBuf> {
-    let path = Path::new(
-            &env::var("XDG_RUNTIME_DIR")
-            .unwrap_or_else(|_| format!("/tmp"))
-        )
-        .join(format!("xfce4-niri-{}", crate::current_uid() ));
+
+    let path = match env::var("XDG_RUNTIME_DIR") {
+        Ok(path) => Path::new(&path)
+                                .to_path_buf()
+                                .join(format!("xfce4-niri")),
+
+        Err(_) => Path::new("/tmp")
+                        .to_path_buf()
+                        .join(format!("xfce4-niri-{}", current_uid())),
+    };
 
     if !path.exists() {
         fs::create_dir(&path).map_err( |e| Error::UnhandledOwned(e.to_string()))?;

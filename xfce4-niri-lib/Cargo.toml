@@ -20,3 +20,8 @@ test-support = []
 [dependencies]
 glib = "0.18"
 osal-rs = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["posix"]}
+
+[dev-dependencies]
+# The integration tests reach for the helpers behind `test-support`; the feature
+# stays off in a normal build.
+xfce4-niri-lib = { path = ".", features = ["test-support"] }

@@ -23,6 +23,7 @@ mod autostart;
 mod brightness;
 mod data;
 mod dbus;
+#[cfg(not(feature = "disable_autostart"))]
 mod desktop_entry;
 mod lock_screen;
 //mod syslog;
@@ -123,13 +124,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(msg.into());
     };
 
-    if let Err(e) = Socket::new(unix_socket).start_server(&lock_file, Mutex::new_arc(handle_request)) {
+    let mut socket = Socket::new(unix_socket);
+    if let Err(e) = socket.start_server(&lock_file, Mutex::new_arc(handle_request)) {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into())
     }
 
     System::start();
+
+    socket.stop();
 
     Ok(())
 }
