@@ -32,6 +32,7 @@ use crate::syslog::{Options, Priority, SysLog};
 use osal_rs::os::{Mutex, MutexFn, Thread, ThreadFn};
 use osal_rs::utils::{Error, Result};
 
+pub type OnRequest = Arc<Mutex<dyn Fn(&[String]) + Send + Sync + 'static>>;
 struct SocketGuard(PathBuf);
 
 impl Drop for SocketGuard {
@@ -40,13 +41,12 @@ impl Drop for SocketGuard {
     }
 }
 
-type OnRequest = Arc<Mutex<dyn Fn(&[String]) + Send + Sync + 'static>>;
-
 pub struct Socket{
     unix_socket: PathBuf,
     on_request: OnRequest,
     thread: Thread
 }
+
 
 impl Socket {
 
@@ -54,30 +54,29 @@ impl Socket {
 
     pub const LOCK_FILE: &str = Lock::LOCK_FILE;
 
-    pub fn new(unix_socket: PathBuf, on_request: impl Fn(&[String]) + Send + Sync + 'static) -> Self {
+    pub fn new(unix_socket: PathBuf) -> Self {
         Socket{
             unix_socket,
-            on_request: Mutex::new_arc(on_request),
+            on_request: Mutex::new_arc(|_request: &[String]| {}),
             thread: Thread::new("lock_screen_thd", 0, 0)
         }
     }
 
-    pub fn start_server(&mut self, socket_file: &str) -> Result<()> {
-        let lock_file = Lock::get_path(None)?;
-
-        if !fs::exists(&lock_file).map_err(|e| Error::UnhandledOwned(e.to_string()))? {
+    pub fn start_server(&mut self, lock: &Lock, on_request: OnRequest) -> Result<()> {
+        if !lock.exists().map_err(|e| Error::UnhandledOwned(e.to_string()))? {
             return Err(Error::UnhandledOwned("fxce4-niri-service seems down".into()))
         }
 
-        
         let Some(parent) = self.unix_socket.parent() else {
             return Err(Error::UnhandledOwned("invalid socket file path".into()))
         };
 
+        self.on_request = on_request;
+
         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
         let mut full_path = PathBuf::from(parent);
-        full_path.push(socket_file);
+        full_path.push(&self.unix_socket);
 
 
         match UnixStream::connect(&full_path) {

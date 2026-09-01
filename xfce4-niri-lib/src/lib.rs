@@ -30,9 +30,13 @@ pub mod test_support;
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs};
+
+use osal_rs::utils::{Error, Result};
+
+use crate::lock::Lock;
 
 fn is_program(path: impl AsRef<Path>) -> bool {
 
@@ -81,6 +85,20 @@ pub fn current_uid() -> u32 {
         .and_then(|o| String::from_utf8(o.stdout).ok())
         .and_then(|s| s.trim().parse().ok())
         .unwrap_or(0)
+}
+
+pub fn get_safe_path(file_name: Option<&str>) -> Result<PathBuf> {
+    let path = Path::new(
+            &env::var("XDG_RUNTIME_DIR")
+            .unwrap_or_else(|_| format!("/tmp"))
+        )
+        .join(format!("xfce4-niri-{}", crate::current_uid() ));
+
+    if !path.exists() {
+        fs::create_dir(&path).map_err( |e| Error::UnhandledOwned(e.to_string()))?;
+    }
+
+    Ok(path.join(file_name.unwrap_or(Lock::LOCK_FILE)))
 }
 
 #[cfg(test)]

@@ -28,6 +28,8 @@ mod lock_screen;
 //mod syslog;
 
 extern crate osal_rs;
+use std::sync::Arc;
+use osal_rs::os::Mutex;
 
 use xfce4_niri_lib::lock::Lock;
 use xfce4_niri_lib::socket::Socket;
@@ -46,12 +48,17 @@ use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 const APP_TAG: &str = "Xfce4NiriService";
 
+fn handle_request(request: &[String]) {
+    // Handle the request here
+    println!("Received request: {:?}", request);
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
 
     let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
-    let _ = match Lock::acquire(None) {
-        Ok(lock) => lock,
+    let lock_file = match Lock::acquire(None) {
+        Ok(lock_file) => lock_file,
         Err(e) => {
             let msg = e.to_string();
             log.syslog(APP_TAG, Priority::LogInfo, &msg);
@@ -74,7 +81,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Err(e) = Data::share().check_persistence() {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
-        return Err(msg.into());
+        return Err(msg.into())
     }
 
     let mut dbus = match DBus::new() {
@@ -82,37 +89,46 @@ fn main() -> Result<(), Box<dyn Error>> {
         Err(e) => {
             let msg = e.to_string();
             log.syslog(APP_TAG, Priority::LogCrit, &msg);
-            return Err(msg.into());
+            return Err(msg.into())
         },
     };
 
     if let Err(e) = Brightness::new().start() {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
-        return Err(msg.into());
+        return Err(msg.into())
     }
 
     if let Err(e) = LockScreen::new().start(&dbus) {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
-        return Err(msg.into());
+        return Err(msg.into())
     }
     
     #[cfg(not(feature = "disable_autostart"))]
     if let Err(e) = Autostart::new().start() {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
-        return Err(msg.into());
+        return Err(msg.into())
     }
     
     if let Err(e) = dbus.start() {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
-        return Err(msg.into());
+        return Err(msg.into())
     }
 
-    let 
-    if let Err(e) = Socket::new(unix_socket, on_request) {
+    let Ok(unix_socket) = xfce4_niri_lib::get_safe_path(Some("xfce4-niri-service.sock")) else {
+        let msg = "Failed to get safe path for unix socket";
+        log.syslog(APP_TAG, Priority::LogCrit, &msg);
+        return Err(msg.into());
+    };
+
+    if let Err(e) = Socket::new(unix_socket).start_server(&lock_file, Mutex::new_arc(handle_request)) {
+        let msg = e.to_string();
+        log.syslog(APP_TAG, Priority::LogCrit, &msg);
+        return Err(msg.into())
+    }
 
     System::start();
 
