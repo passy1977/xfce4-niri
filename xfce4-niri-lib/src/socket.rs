@@ -21,7 +21,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixStream, UnixListener};
 use std::path::PathBuf;
-use std::io::{BufRead, BufReader, ErrorKind};
+use std::io::{BufRead, BufReader, ErrorKind, Write};
 use std::ffi::c_int;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -149,6 +149,32 @@ impl Socket {
             (on_request.lock().unwrap())(&args);
         }
 
+
+        Ok(())
+    }
+
+     
+    pub fn run_client(&self, lock: &Lock, commands: &[String]) -> Result<()> {
+        if !lock.exists().map_err(|e| Error::UnhandledOwned(e.to_string()))? {
+            return Err(Error::UnhandledOwned("fxce4-niri-service seems down".into()))
+        }
+
+        let stream = UnixStream::connect(&self.unix_socket).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+
+        let mut writer = stream.try_clone().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let mut reader = BufReader::new(stream);
+
+        for command in commands {
+            writeln!(writer, "{command}").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+            writer.flush().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+
+            let mut reply = String::new();
+            if reader.read_line(&mut reply).map_err(|e| Error::UnhandledOwned(e.to_string()))? == 0 {
+                return Err(Error::UnhandledOwned("server closed the connection".into()));
+            }
+
+            println!("{}", reply.trim_end());
+        }
 
         Ok(())
     }

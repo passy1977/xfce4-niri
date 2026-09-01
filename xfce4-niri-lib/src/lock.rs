@@ -66,6 +66,10 @@ impl Lock {
         Ok(lock_file.exists())
     }
 
+    pub fn from_path(path: &PathBuf) -> Self {
+        Self(path.clone())
+    }
+
 }
 
 impl Drop for Lock {

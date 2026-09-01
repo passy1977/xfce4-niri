@@ -28,7 +28,6 @@ mod lock_screen;
 //mod syslog;
 
 extern crate osal_rs;
-use std::sync::Arc;
 use osal_rs::os::Mutex;
 
 use xfce4_niri_lib::lock::Lock;
