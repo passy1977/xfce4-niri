@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(msg.into());
     };
 
-    if let Err(e) = Socket::new(unix_socket).run_client(&lock_file, &vec![]) {
+    if let Err(e) = Socket::new(unix_socket).run_client(&lock_file, &vec!["Ciao".to_owned()]) {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into())
