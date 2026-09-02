@@ -29,7 +29,6 @@ mod lock_screen;
 //mod syslog;
 
 extern crate osal_rs;
-use osal_rs::os::Mutex;
 
 use xfce4_niri_lib::lock::Lock;
 use xfce4_niri_lib::socket::Socket;
@@ -129,7 +128,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let mut socket = Socket::new(unix_socket);
-    if let Err(e) = socket.start_server(&lock_file, Mutex::new_arc(handle_request)) {
+    if let Err(e) = socket.start_server(&lock_file, &handle_request) {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into())

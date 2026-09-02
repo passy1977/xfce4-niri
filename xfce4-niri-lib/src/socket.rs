@@ -23,15 +23,14 @@ use std::os::unix::net::{UnixStream, UnixListener};
 use std::path::PathBuf;
 use std::io::{BufRead, BufReader, ErrorKind, Write};
 use std::ffi::c_int;
-use std::sync::Arc;
 
 use crate::lock::Lock;
 use crate::syslog::{Options, Priority, SysLog};
 
-use osal_rs::os::{Mutex, MutexFn, Thread, ThreadFn};
+use osal_rs::os::{Thread, ThreadFn};
 use osal_rs::utils::{Error, Result};
 
-pub type OnRequest = Arc<Mutex<dyn Fn(&[String]) + Send + Sync + 'static>>;
+pub type OnRequest = dyn Fn(&[String]) + Send + Sync + 'static;
 
 /// Unlinks the socket node when the accept loop that owns it goes away, so the
 /// next start does not find a stale one.
@@ -45,7 +44,6 @@ impl Drop for SocketGuard {
 
 pub struct Socket{
     unix_socket: PathBuf,
-    on_request: OnRequest,
     thread: Thread
 }
 
@@ -63,12 +61,11 @@ impl Socket {
     pub fn new(unix_socket: PathBuf) -> Self {
         Socket{
             unix_socket,
-            on_request: Mutex::new_arc(|_request: &[String]| {}),
             thread: Thread::new("socket_srv_thd", 0, 0),
         }
     }
 
-    pub fn start_server(&mut self, lock: &Lock, on_request: OnRequest) -> Result<()> {
+    pub fn start_server(&mut self, lock: &Lock, on_request: &'static OnRequest) -> Result<()> {
         if !lock.exists().map_err(|e| Error::UnhandledOwned(e.to_string()))? {
             return Err(Error::UnhandledOwned("fxce4-niri-service seems down".into()))
         }
@@ -78,8 +75,6 @@ impl Socket {
         };
 
         fs::create_dir_all(parent).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-
-        self.on_request = on_request;
 
         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
@@ -96,8 +91,6 @@ impl Socket {
         }
 
         log.syslog(Self::APP_TAG, Priority::LogDebug, &format!("listening on {}", path.display()));
-
-        let on_request = Arc::clone(&self.on_request);
 
         self.thread.spawn_simple(move || {
             let listener = UnixListener::bind(&path).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
@@ -129,12 +122,9 @@ impl Socket {
 
     fn handle_client(stream: &UnixStream, on_request: &OnRequest) -> Result<()> {
 
-        // Reading and writing side both borrow the same fd: `&UnixStream` is
-        // itself `Read` and `Write`, so there is nothing to dup.
         let mut writer = stream;
         let reader = BufReader::new(stream);
 
-        // lines() ends on EOF, which is what a client dropping its end looks like.
         for line in reader.lines() {
             let line = line.map_err(|e| Error::UnhandledOwned(e.to_string()))?;
             let args: Vec<String> = line
@@ -143,12 +133,8 @@ impl Socket {
                                         .map(|s| s.to_string())
                                         .collect();
 
-            let Ok(callback) = on_request.lock() else {
-                return Err(Error::Unhandled("failed to take the request callback"))
-            };
 
-            callback(&args);
-            drop(callback);
+            on_request(&args);
 
             // The client reads one line back per command it wrote: with no
             // answer it would sit on read_line() until the service goes away.
