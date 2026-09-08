@@ -22,6 +22,7 @@ exclude = [
 
 [features]
 disable_autostart = []
+disable_niri_check = []
 
 [dependencies]
 xfce4-niri-lib = { version = "0", path = "../xfce4-niri-lib" }

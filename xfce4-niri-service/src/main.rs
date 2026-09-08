@@ -29,7 +29,6 @@ mod lock_screen;
 //mod syslog;
 
 extern crate osal_rs;
-use osal_rs::os::Mutex;
 
 use xfce4_niri_lib::lock::Lock;
 use xfce4_niri_lib::socket::Socket;
@@ -43,6 +42,7 @@ use crate::data::Data;
 use crate::dbus::DBus;
 use crate::brightness::Brightness;
 use crate::lock_screen::LockScreen;
+#[cfg(not(feature = "disable_niri_check"))]
 use xfce4_niri_lib::niri::Niri;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
@@ -70,17 +70,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
-    let version = match Niri::version() {
-        Some(version) => version,
-        None => {
-            let msg = "Niri not ruining";
-            log.syslog(APP_TAG, Priority::LogCrit, &msg);
-            return Err(msg.into())
-        }
-    };
-    
+    #[cfg(not(feature = "disable_niri_check"))]
+    {
+        let version = match Niri::version() {
+            Some(version) => version,
+            None => {
+                let msg = "Niri not ruining";
+                log.syslog(APP_TAG, Priority::LogCrit, &msg);
+                return Err(msg.into())
+            }
+        };
+        
+        log.syslog(APP_TAG, Priority::LogDebug, &format!("Niri {} running", version));
+    }
     log.syslog(APP_TAG, Priority::LogDebug, &format!("Version {}", env!("CARGO_PKG_VERSION")));
-    log.syslog(APP_TAG, Priority::LogDebug, &format!("Niri {} running", version));
 
     if let Err(e) = Data::share().check_persistence() {
         let msg = e.to_string();
@@ -129,7 +132,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let mut socket = Socket::new(unix_socket);
-    if let Err(e) = socket.start_server(&lock_file, Mutex::new_arc(handle_request)) {
+    if let Err(e) = socket.start_server(&lock_file, &handle_request) {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into())

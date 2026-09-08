@@ -26,7 +26,13 @@ use std::fs::OpenOptions;
 
 use osal_rs::utils::{Error, Result};
 
-pub struct Lock (PathBuf);
+pub struct Lock {
+    path: PathBuf,
+    /// Whether this instance holds the flock and is responsible for removing
+    /// the file on drop. `from_path` only wraps the path to check for the
+    /// service's presence and never owns the lock.
+    owned: bool,
+}
 
 mod ffi {
     use std::ffi::c_int;
@@ -52,22 +58,26 @@ impl Lock {
         }
 
         Ok(
-            Self(
-                lock_file
-            )
+            Self {
+                path: lock_file,
+                owned: true,
+            }
         )
     }
 
     pub fn exists(&self) -> Result<bool> {
         let lock_file = crate::get_safe_path(
-            Some(self.0.to_str().unwrap_or(Self::LOCK_FILE))
+            Some(self.path.to_str().unwrap_or(Self::LOCK_FILE))
         )?;
 
         Ok(lock_file.exists())
     }
 
     pub fn from_path(path: &PathBuf) -> Self {
-        Self(path.clone())
+        Self {
+            path: path.clone(),
+            owned: false,
+        }
     }
 
 }
@@ -75,8 +85,12 @@ impl Lock {
 impl Drop for Lock {
     fn drop(&mut self) {
 
+        if !self.owned {
+            return;
+        }
+
         if let Ok(lock_file) = crate::get_safe_path(
-            Some(self.0.to_str().unwrap_or(Self::LOCK_FILE))
+            Some(self.path.to_str().unwrap_or(Self::LOCK_FILE))
         ) {
             let _ = fs::remove_file(lock_file);
         }
