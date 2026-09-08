@@ -30,7 +30,7 @@ use crate::syslog::{Options, Priority, SysLog};
 use osal_rs::os::{Thread, ThreadFn};
 use osal_rs::utils::{Error, Result};
 
-pub type OnRequest = dyn Fn(&[String]) + Send + Sync + 'static;
+pub type OnRequest = dyn Fn(&[String]) -> Result<()> + Send + Sync + 'static;
 
 /// Unlinks the socket node when the accept loop that owns it goes away, so the
 /// next start does not find a stale one.
@@ -105,12 +105,12 @@ impl Socket {
                 match listener.accept() {
                     Ok((stream, _addr)) => {
                         println!("New connection accepted");
-                        let mut stream = stream.try_clone().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+                        let mut writer = &stream;
                         if let Err(e) = Self::handle_client(&stream, &on_request) {
-                            stream.write(Self::REPLY_KO.as_bytes()).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+                            let _ = writer.write(Self::REPLY_KO.as_bytes());
                             log.syslog(Self::APP_TAG, Priority::LogErr, &format!("{e}"));
                         } else {
-                            stream.write(Self::REPLY_OK.as_bytes()).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+                            let _ = writer.write(Self::REPLY_OK.as_bytes());
                         }
                     }
                     Err(e) => eprintln!("Accept error: {}", e)
@@ -139,7 +139,7 @@ impl Socket {
                                         .collect();
 
 
-            on_request(&args);
+            on_request(&args)?;
 
             writeln!(writer, "{}", Self::REPLY_OK).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
             writer.flush().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
@@ -172,7 +172,7 @@ impl Socket {
             return Err(Error::UnhandledOwned("server closed the connection".into()));
         }
 
-        println!("{}", reply.trim_end());
+        println!("to handle:{}", reply.trim_end());
 
         Ok(())
     }
