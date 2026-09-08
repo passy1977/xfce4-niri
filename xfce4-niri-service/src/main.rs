@@ -49,8 +49,12 @@ use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 const APP_TAG: &str = "Xfce4NiriService";
 
 fn handle_request(request: &[String]) {
-    // Handle the request here
-    println!("Received request: {:?}", request);
+    let mut count = 0;
+    for str in request {
+        println!("--->({count}): {:?}", str);
+        count += 1;
+    }
+    
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

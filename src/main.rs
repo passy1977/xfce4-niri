@@ -53,7 +53,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(msg.into());
     };
 
-    if let Err(e) = Socket::new(unix_socket).run_client(&lock_file, &vec![]) {
+    let commands: Vec<String> = std::env::args().skip(1).collect();
+
+    if let Err(e) = Socket::new(unix_socket).run_client(&lock_file, &commands) {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into())

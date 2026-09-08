@@ -106,21 +106,21 @@ impl Socket {
 
             let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
-            let mut connections: Vec<Thread> = Vec::new();
+            // let mut connections: Vec<Thread> = Vec::new();
 
             for stream in listener.incoming() {
                 if !running.load(Ordering::SeqCst) {
                     break;
                 }
 
-                connections.retain(|connection| {
-                    if Thread::get_metadata(connection).state == ThreadState::Deleted {
-                        connection.delete();
-                        false
-                    } else {
-                        true
-                    }
-                });
+                // connections.retain(|connection| {
+                //     if Thread::get_metadata(connection).state == ThreadState::Deleted {
+                //         connection.delete();
+                //         false
+                //     } else {
+                //         true
+                //     }
+                // });
 
                 let stream = match stream {
                     Ok(stream) => stream,
@@ -133,18 +133,24 @@ impl Socket {
                     }
                 };
 
-                let on_request = Arc::clone(&on_request);
-                let mut connection = Thread::new("socket_cli_thd", 0, 0);
 
-                connections.push(connection.spawn_simple(move || {
+                if let Err(e) = Self::handle_client(&stream, &on_request) {
+                    let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
+                    log.syslog(Self::APP_TAG, Priority::LogErr, &format!("connection error: {e}"));
+                }
 
-                    if let Err(e) = Self::handle_client(&stream, &on_request) {
-                        let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
-                        log.syslog(Self::APP_TAG, Priority::LogErr, &format!("connection error: {e}"));
-                    }
+                // let on_request = Arc::clone(&on_request);
+                // let mut connection = Thread::new("socket_cli_thd", 0, 0);
 
-                    Ok(Arc::new(()))
-                })?);
+                // connection.spawn_simple(move || {
+
+                //     if let Err(e) = Self::handle_client(&stream, &on_request) {
+                //         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
+                //         log.syslog(Self::APP_TAG, Priority::LogErr, &format!("connection error: {e}"));
+                //     }
+
+                //     Ok(Arc::new(()))
+                // })?;
             }
 
             // Dropping the guard here, on the way out, is what unlinks the node.
