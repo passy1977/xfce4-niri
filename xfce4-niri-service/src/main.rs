@@ -36,6 +36,7 @@ use xfce4_niri_lib::socket::Socket;
 use std::{error::Error, ffi::c_int};
 
 use osal_rs::os::{System, SystemFn};
+use osal_rs::utils::Result as OsalResult;
 #[cfg(not(feature = "disable_autostart"))]
 use crate::autostart::Autostart;
 use crate::data::Data;
@@ -48,13 +49,14 @@ use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 const APP_TAG: &str = "Xfce4NiriService";
 
-fn handle_request(request: &[String]) {
+fn handle_request(request: &[String]) -> OsalResult<()>{
     let mut count = 0;
     for str in request {
         println!("--->({count}): {:?}", str);
         count += 1;
     }
     
+    Ok(())
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

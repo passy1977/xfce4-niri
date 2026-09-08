@@ -52,10 +52,9 @@ impl Socket {
 
     const APP_TAG: &str = "xfce4-niri";
 
-    /// What the server writes back for every line it takes in: `run_client`
-    /// reads one reply per command, so every command has to be answered.
     const REPLY_OK: &str = "OK";
     const REPLY_KO: &str = "KO";
+    const MAX_PARAM_SPLIT: usize = 3;
 
     pub const LOCK_FILE: &str = Lock::LOCK_FILE;
 
@@ -134,7 +133,7 @@ impl Socket {
             let line = line.map_err(|e| Error::UnhandledOwned(e.to_string()))?;
             let args: Vec<String> = line
                                         .trim()
-                                        .splitn(3, ' ')
+                                        .splitn(Self::MAX_PARAM_SPLIT, ' ')
                                         .map(|s| s.to_string())
                                         .collect();
 
