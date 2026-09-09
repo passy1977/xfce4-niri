@@ -66,7 +66,7 @@ impl Socket {
     }
 
     pub fn start_server(&mut self, lock: &Lock, on_request: &'static OnRequest) -> Result<()> {
-        if !lock.exists().map_err(|e| Error::UnhandledOwned(e.to_string()))? {
+        if !lock.is_locked(&mut None).map_err(|e| Error::UnhandledOwned(e.to_string()))? {
             return Err(Error::UnhandledOwned("fxce4-niri-service seems down".into()))
         }
 
@@ -102,14 +102,13 @@ impl Socket {
 
             loop {
                 match listener.accept() {
-                    Ok((stream, _addr)) => {
+                    Ok((ref mut stream, _addr)) => {
                         println!("New connection accepted");
-                        let mut writer = &stream;
                         if let Err(e) = Self::handle_client(&stream, &on_request) {
-                            let _ = writer.write(Self::REPLY_KO.as_bytes());
+                            let _ = stream.write(Self::REPLY_KO.as_bytes());
                             log.syslog(Self::APP_TAG, Priority::LogErr, &format!("{e}"));
                         } else {
-                            let _ = writer.write(Self::REPLY_OK.as_bytes());
+                            let _ = stream.write(Self::REPLY_OK.as_bytes());
                         }
                     }
                     Err(e) => eprintln!("Accept error: {}", e)
@@ -150,7 +149,7 @@ impl Socket {
 
      
     pub fn run_client(&self, lock: &Lock, commands: &[String]) -> Result<()> {
-        if !lock.exists().map_err(|e| Error::UnhandledOwned(e.to_string()))? {
+        if !lock.is_locked(&mut None).map_err(|e| Error::UnhandledOwned(e.to_string()))? {
             return Err(Error::UnhandledOwned("fxce4-niri-service seems down".into()))
         }
 

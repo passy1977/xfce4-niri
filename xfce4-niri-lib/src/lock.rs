@@ -18,11 +18,12 @@
  *
  ***************************************************************************/
 
-use std::ffi::c_int;
-use std::fs;
+use std::{ffi::c_int, io::Write};
+use std::{fs, process};
 use std::os::unix::prelude::AsRawFd;
 use std::path::PathBuf;
 use std::fs::OpenOptions;
+use std::io::{Error as IoError, Read};
 
 use osal_rs::utils::{Error, Result};
 
@@ -43,6 +44,8 @@ impl Lock {
 
     const LOCK_EX: c_int = 2;
     const LOCK_NB: c_int = 4;
+    const LOCK_UN: c_int = 8;
+    const EWOULDBLOCK: c_int = 11;
     
     pub const LOCK_FILE: &str = "xfce4-niri-service.lock";
 
@@ -50,12 +53,16 @@ impl Lock {
         
         let lock_file = crate::get_safe_path(file_name)?;
         
-        let file = OpenOptions::new().create(true).read(true).write(true).open(&lock_file)
+        let mut file = OpenOptions::new().create(true).read(true).write(true).open(&lock_file)
             .map_err(|e| Error::UnhandledOwned(e.to_string()))?;
 
         if unsafe { ffi::flock(file.as_raw_fd(), Self::LOCK_EX | Self::LOCK_NB) } != 0 {
             return Err(Error::UnhandledOwned("another instance is already running".into()));
         }
+
+         let my_pid = process::id().to_ne_bytes();
+
+        file.write(&my_pid).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
 
         Ok(
             Self {
@@ -65,12 +72,32 @@ impl Lock {
         )
     }
 
-    pub fn exists(&self) -> Result<bool> {
+    pub fn is_locked(&self, pid: &mut Option<u32>) -> Result<bool> {
         let lock_file = crate::get_safe_path(
             Some(self.path.to_str().unwrap_or(Self::LOCK_FILE))
         )?;
 
-        Ok(lock_file.exists())
+        let mut file = OpenOptions::new().read(true).write(true).open(&lock_file)
+            .map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+
+        if unsafe { ffi::flock(file.as_raw_fd(), Self::LOCK_EX | Self::LOCK_NB) } != 0 {
+            let err = IoError::last_os_error();
+            return match err.raw_os_error() {
+                Some(Self::EWOULDBLOCK) => Ok(true),
+                _ => Err(Error::UnhandledOwned(err.to_string())),
+            };
+        }
+
+        if let Some(pid) = pid {
+            let mut buf = [0u8; 4];
+            file.read(&mut buf).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+
+            *pid = buf[0] as u32 | (buf[1] as u32) << 8 | (buf[2] as u32) << 16 | (buf[3] as u32) << 24;
+        }
+        
+
+        let _ = unsafe { ffi::flock(file.as_raw_fd(), Self::LOCK_UN) };
+        Ok(false)
     }
 
     pub fn from_path(path: &PathBuf) -> Self {

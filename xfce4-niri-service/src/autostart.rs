@@ -21,10 +21,8 @@
 use std::collections::HashMap;
 use std::env::{self};
 use std::ffi::c_int;
-use std::fs;
-// use std::ffi::c_int;
 use std::path::Path;
-use std::process::{self, Child, Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -112,50 +110,6 @@ impl Autostart {
         .collect())
     }
 
-
-    fn is_running(program: &String) -> bool {
-
-        let target = Path::new(program)
-            .file_name()
-            .map(|it| it.to_string_lossy().to_string())
-            .unwrap_or_else(|| program.to_string());
-
-
-        let Ok(entries) = fs::read_dir("/proc") else {
-            return false
-        };
-
-        let me = process::id();
-
-
-        for entry in entries {
-            let Ok(entry) = entry else {
-                continue
-            };
-
-            let Ok(pid) = entry.file_name().to_string_lossy().parse::<u32>() else {
-                continue
-            };
-
-            if pid == me {
-                continue
-            }
-
-            let path = format!("/proc/{pid}/exe");
-            let Ok(path) = fs::read_link(&path) else {
-                continue
-            };
-
-            if let Some(name) = path.file_name() {
-                if name.to_string_lossy() == target {
-                    return true
-                }
-            }
-        }
-
-        false
-    }
-
     fn exec(program: &String, args: &[String]) -> Result<Child> {
 
         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
@@ -225,10 +179,10 @@ impl Autostart {
                     continue
                 }
 
-                if Self::is_running(&program) {
-                    log.syslog(Self::APP_TAG, Priority::LogInfo, &format!("Start: {name} - {:?} - skip (already running)", &entry.exec_argv()));
-                    continue
-                }
+                // if Self::is_running(&program) {
+                //     log.syslog(Self::APP_TAG, Priority::LogInfo, &format!("Start: {name} - {:?} - skip (already running)", &entry.exec_argv()));
+                //     continue
+                // }
 
                 let child = Self::exec(&program, &argv);
                 if let Err(_e  @ Error::NotFound) = child {

@@ -40,8 +40,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
+    let mut pid = Some(0u32);
     let lock_file = Lock::from_path(&lock_file);
-    if !lock_file.exists().unwrap_or(false) {
+    if !lock_file.is_locked(&mut pid).unwrap_or(false) {
         let msg = format!("fxce4-niri-service not running");
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into());
