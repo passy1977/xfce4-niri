@@ -65,10 +65,7 @@ impl Socket {
         }
     }
 
-    pub fn start_server(&mut self, lock: &Lock, on_request: &'static OnRequest) -> Result<()> {
-        if !lock.is_locked(&mut None).map_err(|e| Error::UnhandledOwned(e.to_string()))? {
-            return Err(Error::UnhandledOwned("fxce4-niri-service seems down".into()))
-        }
+    pub fn start_server(&mut self, on_request: &'static OnRequest) -> Result<()> {
 
         let Some(parent) = self.unix_socket.parent() else {
             return Err(Error::UnhandledOwned("invalid socket file path".into()))
@@ -148,10 +145,7 @@ impl Socket {
     }
 
      
-    pub fn run_client(&self, lock: &Lock, commands: &[String]) -> Result<()> {
-        if !lock.is_locked(&mut None).map_err(|e| Error::UnhandledOwned(e.to_string()))? {
-            return Err(Error::UnhandledOwned("fxce4-niri-service seems down".into()))
-        }
+    pub fn run_client(&self, commands: &[String]) -> Result<()> {
 
         let stream = UnixStream::connect(&self.unix_socket)
             .map_err(|e| Error::UnhandledOwned(format!("cannot connect to {}: {e} (is the service running?)", self.unix_socket.display())))?;

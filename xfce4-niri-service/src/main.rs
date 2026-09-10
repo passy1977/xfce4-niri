@@ -63,10 +63,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
-    let lock_file = match Lock::acquire(None) {
+    let mut pid = Some(String::new());
+    let _lock = match Lock::acquire(None, &mut pid) {
         Ok(lock_file) => lock_file,
         Err(e) => {
-            let msg = e.to_string();
+
+            let pid = pid.unwrap();
+            let msg = if pid == "" {
+                e.to_string()
+            } else {
+                format!("Service already running by:{pid}")
+            };
+
             log.syslog(APP_TAG, Priority::LogInfo, &msg);
             return Err(msg.into());
         }
@@ -134,7 +142,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let mut socket = Socket::new(unix_socket);
-    if let Err(e) = socket.start_server(&lock_file, &handle_request) {
+    if let Err(e) = socket.start_server(&handle_request) {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into())

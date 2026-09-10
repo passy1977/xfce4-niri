@@ -44,12 +44,12 @@ impl Lock {
 
     const LOCK_EX: c_int = 2;
     const LOCK_NB: c_int = 4;
-    const LOCK_UN: c_int = 8;
+    // const LOCK_UN: c_int = 8;
     const EWOULDBLOCK: c_int = 11;
     
     pub const LOCK_FILE: &str = "xfce4-niri-service.lock";
 
-    pub fn acquire(file_name: Option<&str>) -> Result<Self> {
+    pub fn acquire(file_name: Option<&str>, locked_by: &mut Option<String>) -> Result<Self> {
         
         let lock_file = crate::get_safe_path(file_name)?;
         
@@ -57,12 +57,15 @@ impl Lock {
             .map_err(|e| Error::UnhandledOwned(e.to_string()))?;
 
         if unsafe { ffi::flock(file.as_raw_fd(), Self::LOCK_EX | Self::LOCK_NB) } != 0 {
-            return Err(Error::UnhandledOwned("another instance is already running".into()));
+            let mut locked_by_id = String::new();
+            file.read_to_string(&mut  locked_by_id).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+            if let Some(locked_by) = locked_by {
+                *locked_by = locked_by_id.clone();
+            }
+            return Err(Error::UnhandledOwned(format!("Another instance running, pid:{locked_by_id}")));
         }
 
-         let my_pid = process::id().to_ne_bytes();
-
-        file.write(&my_pid).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        file.write_fmt(format_args!("{pid}", pid = process::id())).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
 
         Ok(
             Self {
@@ -72,7 +75,7 @@ impl Lock {
         )
     }
 
-    pub fn is_locked(&self, pid: &mut Option<u32>) -> Result<bool> {
+    pub fn is_locked(&self, locked_by: &mut Option<String>) -> Result<bool> {
         let lock_file = crate::get_safe_path(
             Some(self.path.to_str().unwrap_or(Self::LOCK_FILE))
         )?;
@@ -83,20 +86,17 @@ impl Lock {
         if unsafe { ffi::flock(file.as_raw_fd(), Self::LOCK_EX | Self::LOCK_NB) } != 0 {
             let err = IoError::last_os_error();
             return match err.raw_os_error() {
-                Some(Self::EWOULDBLOCK) => Ok(true),
+                Some(Self::EWOULDBLOCK) => {
+                    if let Some(locked_by) = locked_by {
+                        file.read_to_string(locked_by).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+                    }
+                    Ok(true)
+                }
                 _ => Err(Error::UnhandledOwned(err.to_string())),
             };
         }
-
-        if let Some(pid) = pid {
-            let mut buf = [0u8; 4];
-            file.read(&mut buf).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-
-            *pid = buf[0] as u32 | (buf[1] as u32) << 8 | (buf[2] as u32) << 16 | (buf[3] as u32) << 24;
-        }
         
-
-        let _ = unsafe { ffi::flock(file.as_raw_fd(), Self::LOCK_UN) };
+        //let _ = unsafe { ffi::flock(file.as_raw_fd(), Self::LOCK_UN) };
         Ok(false)
     }
 

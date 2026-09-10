@@ -40,10 +40,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
-    let mut pid = Some(0u32);
+    let mut pid = Some(String::new());
     let lock_file = Lock::from_path(&lock_file);
     if !lock_file.is_locked(&mut pid).unwrap_or(false) {
-        let msg = format!("fxce4-niri-service not running");
+
+        let pid = pid.unwrap();
+
+        let msg = if pid == "" {
+            format!("fxce4-niri-service not running")
+        } else {
+            format!("fxce4-niri-service not running")
+        };
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into());
     }
@@ -56,7 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let commands: Vec<String> = std::env::args().skip(1).collect();
 
-    if let Err(e) = Socket::new(unix_socket).run_client(&lock_file, &commands) {
+    if let Err(e) = Socket::new(unix_socket).run_client(&commands) {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into())
