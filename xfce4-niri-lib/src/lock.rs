@@ -65,6 +65,7 @@ impl Lock {
             return Err(Error::UnhandledOwned(format!("Another instance running, pid:{locked_by_id}")));
         }
 
+        file.set_len(0).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
         file.write_fmt(format_args!("{pid}", pid = process::id())).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
 
         Ok(
