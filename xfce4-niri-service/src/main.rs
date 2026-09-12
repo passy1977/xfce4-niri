@@ -49,6 +49,18 @@ use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 const APP_TAG: &str = "Xfce4NiriService";
 
+mod ffi {
+    use std::ffi::c_int;
+    pub(super) const SIGINT: c_int = 2;
+    pub(super) const SIGTERM: c_int = 15;
+    unsafe extern "C" { pub(super) fn signal(signum: c_int, handler: extern "C" fn(c_int)) -> usize; }
+}
+
+// Only an atomic store happens here, so it is safe to call from a signal handler.
+extern "C" fn on_terminate(_signum: c_int) {
+    System::stop();
+}
+
 fn handle_request(request: &[String]) -> OsalResult<()>{
     let mut count = 0;
     for str in request {
@@ -146,6 +158,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
         return Err(msg.into())
+    }
+
+    unsafe {
+        ffi::signal(ffi::SIGINT, on_terminate);
+        ffi::signal(ffi::SIGTERM, on_terminate);
     }
 
     System::start();
