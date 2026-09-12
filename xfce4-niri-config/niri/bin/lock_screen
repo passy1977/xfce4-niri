@@ -13,8 +13,10 @@ if [ -z "$1" ] || [ -z "$2" ]; then
 fi
 
 swayidle -w \
-    timeout $1 "swaylock -C ~/.config/niri/swaylock/config" \
+    timeout $1 "swaylock -f -C ~/.config/niri/swaylock/config" \
     timeout $2 "niri msg action power-off-monitors" \
-    resume "niri msg action power-on-monitors" &
+    resume "niri msg action power-on-monitors" \
+    lock "swaylock -f -C ~/.config/niri/swaylock/config" \
+    before-sleep "swaylock -f -C ~/.config/niri/swaylock/config" &
 
 sleep 1
