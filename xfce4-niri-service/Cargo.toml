@@ -28,4 +28,4 @@ disable_niri_check = []
 xfce4-niri-lib = { version = "0", path = "../xfce4-niri-lib" }
 osal-rs = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["posix", "serde"]}
 osal-rs-serde = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["derive"]}
-dbus = "0.9.12"
+dbus = "0.9"
