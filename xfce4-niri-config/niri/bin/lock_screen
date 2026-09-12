@@ -8,8 +8,8 @@ for cmd in swayidle swaylock; do
 done
 
 if [ -z "$1" ] || [ -z "$2" ]; then
-    echo "Error: missing arguments. Usage: $(basename "$0") <lock_timeout> <screen_off_timeout>" >&2
-    exit 1
+    loginctl lock-session $XDG_SESSION_ID
+    exit 0
 fi
 
 swayidle -w \

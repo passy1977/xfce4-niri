@@ -27,6 +27,7 @@ use osal_rs::access_static_option;
 use osal_rs::os::types::{EventBits, TickType};
 use osal_rs::os::{EventGroup, EventGroupFn, Mutex, MutexFn, MutexGuard, Thread, ThreadFn, ThreadParam};
 use osal_rs::utils::{Error, Result};
+use xfce4_niri_lib::exec;
 
 use crate::data::Data;
 use crate::dbus::DBus;
@@ -347,6 +348,10 @@ impl LockScreen {
         }
 
         
+    }
+
+    pub fn perform_lock_screen() {
+        let _ = exec(Self::APP_TAG, &"lock_screen".to_string(), &[]);
     }
 
     fn kill_lock_screen_command(child: & mut MutexGuard<'_, Option<Child>>) {
