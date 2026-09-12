@@ -27,16 +27,17 @@ pub mod syslog;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_support;
 
-use std::ffi::OsStr;
+use std::ffi::{OsStr, c_int};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Child, Command, Stdio};
 use std::{env, fs};
 
 use osal_rs::utils::{Error, Result};
 
 use crate::lock::Lock;
+use crate::syslog::{Options, Priority, SysLog};
 
 fn is_program(path: impl AsRef<Path>) -> bool {
 
@@ -105,6 +106,21 @@ pub fn get_safe_path(file_name: Option<&str>) -> Result<PathBuf> {
 
     Ok(path.join(file_name.unwrap_or(Lock::LOCK_FILE)))
 }
+
+pub fn exec(tag: &str, program: &String, args: &[String]) -> Result<Child> {
+
+    let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
+    log.syslog(tag, Priority::LogDebug, &format!("Executing: {program} {:?}", args));
+
+    Command::new(program)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| Error::UnhandledOwned(e.to_string()))
+}
+
 
 #[cfg(test)]
 mod tests {

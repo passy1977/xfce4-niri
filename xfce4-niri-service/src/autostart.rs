@@ -22,12 +22,13 @@ use std::collections::HashMap;
 use std::env::{self};
 use std::ffi::c_int;
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::Child;
 use std::sync::Arc;
 use std::time::Duration;
 
 use osal_rs::os::{Mutex, MutexFn, System, Thread, ThreadFn};
 use osal_rs::utils::{Error, Result};
+use xfce4_niri_lib::exec;
 
 use crate::data::{Data, XDG_AUTOSTART};
 use crate::desktop_entry::{DESKTOP_SUFFIX, DesktopEntry, current_desktops};
@@ -110,20 +111,6 @@ impl Autostart {
         .collect())
     }
 
-    fn exec(program: &String, args: &[String]) -> Result<Child> {
-
-        let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
-        log.syslog(Self::APP_TAG, Priority::LogDebug, &format!("Executing: {program} {:?}", args));
-
-        Command::new(program)
-            .args(args)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|e| Error::UnhandledOwned(e.to_string()))
-    }
-
     pub(super) fn start(&mut self) -> Result<()>{
 
         
@@ -179,12 +166,7 @@ impl Autostart {
                     continue
                 }
 
-                // if Self::is_running(&program) {
-                //     log.syslog(Self::APP_TAG, Priority::LogInfo, &format!("Start: {name} - {:?} - skip (already running)", &entry.exec_argv()));
-                //     continue
-                // }
-
-                let child = Self::exec(&program, &argv);
+                let child = exec(Self::APP_TAG, &program, &argv);
                 if let Err(_e  @ Error::NotFound) = child {
                     log.syslog(Self::APP_TAG, Priority::LogInfo, &format!("Start: {name} - {:?} - skip", &entry.exec_argv()));
                     continue
