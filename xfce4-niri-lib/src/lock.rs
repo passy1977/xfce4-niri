@@ -22,17 +22,18 @@ use std::{ffi::c_int, io::Write};
 use std::{fs, process};
 use std::os::unix::prelude::AsRawFd;
 use std::path::PathBuf;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io::{Error as IoError, Read};
 
 use osal_rs::utils::{Error, Result};
 
 pub struct Lock {
     path: PathBuf,
-    /// Whether this instance holds the flock and is responsible for removing
-    /// the file on drop. `from_path` only wraps the path to check for the
-    /// service's presence and never owns the lock.
-    owned: bool,
+    /// The flock lives on this open descriptor: closing it releases the lock,
+    /// so it must stay open as long as the `Lock` exists. `None` for
+    /// `from_path`, which only wraps the path to check for the service's
+    /// presence and never owns the lock.
+    file: Option<File>,
 }
 
 mod ffi {
@@ -44,7 +45,7 @@ impl Lock {
 
     const LOCK_EX: c_int = 2;
     const LOCK_NB: c_int = 4;
-    // const LOCK_UN: c_int = 8;
+    const LOCK_UN: c_int = 8;
     const EWOULDBLOCK: c_int = 11;
     
     pub const LOCK_FILE: &str = "xfce4-niri-service.lock";
@@ -71,7 +72,7 @@ impl Lock {
         Ok(
             Self {
                 path: lock_file,
-                owned: true,
+                file: Some(file),
             }
         )
     }
@@ -97,14 +98,14 @@ impl Lock {
             };
         }
         
-        //let _ = unsafe { ffi::flock(file.as_raw_fd(), Self::LOCK_UN) };
+        let _ = unsafe { ffi::flock(file.as_raw_fd(), Self::LOCK_UN) };
         Ok(false)
     }
 
     pub fn from_path(path: &PathBuf) -> Self {
         Self {
             path: path.clone(),
-            owned: false,
+            file: None,
         }
     }
 
@@ -113,7 +114,7 @@ impl Lock {
 impl Drop for Lock {
     fn drop(&mut self) {
 
-        if !self.owned {
+        if self.file.is_none() {
             return;
         }
 
