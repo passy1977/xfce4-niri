@@ -317,7 +317,7 @@ impl LockScreen {
         let mut child = Command::new(&lock_screen_file)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .arg(format!("{sleep_in_minutes} {off_in_minutes}"))
+            .args([sleep_in_minutes.to_string(), off_in_minutes.to_string()])
             .spawn()
             .expect("Failed to execute command");
 
