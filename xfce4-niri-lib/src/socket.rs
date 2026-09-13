@@ -164,7 +164,7 @@ impl Socket {
             return Err(Error::UnhandledOwned("server closed the connection".into()));
         }
 
-        println!("to handle:{}", reply.trim_end());
+        println!("{}", reply.trim_end());
 
         Ok(())
     }
