@@ -35,6 +35,8 @@ use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 static mut DATA: Option<Data> = None;
 pub(crate) const XDG_AUTOSTART: &str = "/etc/xdg/autostart";
+pub(crate) const LOCK_SCREEN_LOCAL_FILE: &str = "/usr/local/libexec/lock_screen";
+pub(crate) const LOCK_SCREEN_GLOBAL_FILE: &str = "/usr/libexec/lock_screen";
 
 macro_rules! get_env_full_path {
     ($home:expr, $env_var:literal, $real_path:literal) => {{
@@ -65,7 +67,7 @@ impl Data {
 
     const IO_BUFFER_SIZE: usize = 256;
 
-    pub(crate) fn share() -> &'static Self {
+    pub(crate) fn share() -> Self {
 
         let data = unsafe {
             &mut *&raw mut DATA   
@@ -118,22 +120,20 @@ impl Data {
                 };
 
                 unsafe {
-                    (*&raw const DATA).as_ref().unwrap()
+                    (*&raw const DATA).clone().unwrap()
                 }
                 
             },
-            Some(data) => data,
+            Some(data) => data.clone(),
             
         }
 
     }
 
-    pub(crate) fn check_persistence(&self) -> Result<(), String> {
+    pub(crate) fn check_persistence(&mut self) -> Result<(), String> {
         let elements = [
-            // (self.niri_file.clone(), true, format!("Niri config file not found: {}", self.niri_file)),
             (String::from_str(XDG_AUTOSTART).unwrap_or_default(), true, format!("XDG autostart folder not found: {XDG_AUTOSTART}")),
             (self.xdg_home_autostart.clone(), false, format!("XDG home autostart folder not found: {}", self.xdg_home_autostart)),
-            (self.lock_screen_file.clone(), false, format!("Lock screen file not found: {}", self.lock_screen_file)),
         ];
 
         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
@@ -152,11 +152,30 @@ impl Data {
             }
         };
 
-        if !fs::metadata(self.lock_screen_file.clone())
+
+        let lock_screen_file;
+        if Path::new(&self.lock_screen_file).exists() {
+            lock_screen_file = self.lock_screen_file.clone();
+        } else if Path::new(LOCK_SCREEN_LOCAL_FILE).exists() {
+            lock_screen_file = LOCK_SCREEN_LOCAL_FILE.to_owned();
+        } else if Path::new(LOCK_SCREEN_GLOBAL_FILE).exists() {
+            lock_screen_file = LOCK_SCREEN_GLOBAL_FILE.to_owned();
+        } else {
+            return Err(Error::UnhandledOwned(format!("Local lock screen file not found: {}", LOCK_SCREEN_LOCAL_FILE)).to_string());
+        }
+        
+
+        if !fs::metadata(&lock_screen_file)
             .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
             .unwrap_or(false) {
                 return Err(Error::UnhandledOwned(format!("Lock screen file is not executable: {}", self.lock_screen_file)).to_string())
             }
+
+        self.lock_screen_file = lock_screen_file;
+
+        unsafe {
+            (*&raw mut DATA) = Some(self.clone());
+        }
 
         Ok(())
     }
