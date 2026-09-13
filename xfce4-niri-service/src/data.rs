@@ -52,7 +52,7 @@ macro_rules! get_env_full_path {
 #[derive(Default, Clone)]
 pub(crate) struct Data {
     #[allow(dead_code)]
-    pub(crate) niri_file: String,
+    // pub(crate) niri_file: String,
     pub(crate) xdg_home_autostart: String,
     pub(crate) brightness_file: String,
     pub(crate) lock_screen_file: String,
@@ -94,8 +94,8 @@ impl Data {
                 let config = get_env_full_path!(home, "XDG_CONFIG_HOME", "/.config");
                 let state = get_env_full_path!(home, "XDG_STATE_HOME", "/.local/state");
 
-                let mut niri_file = config.clone();
-                niri_file.push_str("niri/config.kdl");
+                // let mut niri_file = config.clone();
+                // niri_file.push_str("niri/config.kdl");
 
                 let mut xdg_home_autostart = home.clone();
                 xdg_home_autostart.push_str("/.config/autostart");
@@ -107,7 +107,7 @@ impl Data {
                 lock_screen_file.push_str("niri/bin/lock_screen");
 
                 let data = Self { 
-                    niri_file, 
+                    // niri_file, 
                     xdg_home_autostart, 
                     brightness_file,
                     lock_screen_file
@@ -130,7 +130,7 @@ impl Data {
 
     pub(crate) fn check_persistence(&self) -> Result<(), String> {
         let elements = [
-            (self.niri_file.clone(), true, format!("Niri config file not found: {}", self.niri_file)),
+            // (self.niri_file.clone(), true, format!("Niri config file not found: {}", self.niri_file)),
             (String::from_str(XDG_AUTOSTART).unwrap_or_default(), true, format!("XDG autostart folder not found: {XDG_AUTOSTART}")),
             (self.xdg_home_autostart.clone(), false, format!("XDG home autostart folder not found: {}", self.xdg_home_autostart)),
             (self.lock_screen_file.clone(), false, format!("Lock screen file not found: {}", self.lock_screen_file)),
