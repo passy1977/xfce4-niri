@@ -252,21 +252,7 @@ impl LockScreen {
                         let mut child = arc_tuple.1.lock().unwrap();
 
                         Self::kill_lock_screen_command(&mut child);
-                        // if let Some(mut child) = child.take() {
-                        //     child.kill().expect("Command couldn't be killed");
-                        // }
-
                     }
-
-                    // match mask {
-                    //     0b0000001 => {
-                    //         println!("Enable presentation mode:{:?}", *data)
-                    //     }
-                    //     0b0000010 => {
-                    //         println!("Disable presentation mode:{:?}", *data)
-                    //     }
-                    //     _ => ()
-                    // }
 
                     
                 }
@@ -327,14 +313,15 @@ impl LockScreen {
         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
 
-        let mut child = Command::new(&Data::share().lock_screen_file)
+        let lock_screen_file = Data::share().lock_screen_file;
+        let mut child = Command::new(&lock_screen_file)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .arg(format!("{} {}", sleep_in_minutes, off_in_minutes))
+            .arg(format!("{sleep_in_minutes} {off_in_minutes}"))
             .spawn()
             .expect("Failed to execute command");
 
-        log.syslog(Self::APP_TAG, Priority::LogInfo, &format!("lock screen pid: {}", child.id()));
+        log.syslog(Self::APP_TAG, Priority::LogInfo, &format!("lock screen pid:{pid} sleep_in_minutes:{sleep_in_minutes} off_in_minutes:{off_in_minutes}", pid =  child.id() ));
 
 
         let Ok(exit_status) = child.wait() else {
@@ -351,7 +338,8 @@ impl LockScreen {
     }
 
     pub fn perform_lock_screen() {
-        let _ = exec(Self::APP_TAG, &"lock_screen".to_string(), &[]);
+        let lock_screen_file = Data::share().lock_screen_file;
+        let _ = exec(Self::APP_TAG, &lock_screen_file, &[]);
     }
 
     fn kill_lock_screen_command(child: & mut MutexGuard<'_, Option<Child>>) {

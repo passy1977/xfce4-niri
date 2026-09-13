@@ -50,7 +50,7 @@ pub struct Socket{
 
 impl Socket {
 
-    const APP_TAG: &str = "xfce4-niri";
+    const APP_TAG: &str = "Socket";
 
     const REPLY_OK: &str = "OK";
     const REPLY_KO: &str = "KO";

@@ -69,7 +69,7 @@ impl SysLog {
 
     pub fn open(option: c_int) -> Self {
         unsafe {
-            ffi::openlog(c"SysLog".as_ptr(), option, Facility::LogUser as c_int);
+            ffi::openlog(c"xfce4-niri".as_ptr(), option, Facility::LogUser as c_int);
         }
         Self
     }
@@ -99,7 +99,7 @@ impl SysLog {
 #[cfg(test)]
 mod tests {
 
-    const APP_TAG: &str = "SysLog";
+    const APP_TAG: &str = "xfce4-niri";
     
     use super::*;
 

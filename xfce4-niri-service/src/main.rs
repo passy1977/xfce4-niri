@@ -48,7 +48,7 @@ use crate::lock_screen::LockScreen;
 use xfce4_niri_lib::niri::Niri;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
-const APP_TAG: &str = "Xfce4NiriService";
+const APP_TAG: &str = "Service";
 
 fn handle_request(request: &[String]) -> OsalResult<()>{
     let mut count = 0;

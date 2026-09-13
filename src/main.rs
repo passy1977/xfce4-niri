@@ -26,7 +26,7 @@ use xfce4_niri_lib::lock::Lock;
 use xfce4_niri_lib::socket::Socket;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
-const APP_TAG: &str = "Xfce4Niri";
+const APP_TAG: &str = "CLI";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let log = SysLog::open(Options::LogPid as i32 | Options::LogNDelay as i32); 

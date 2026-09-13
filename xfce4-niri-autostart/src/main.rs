@@ -49,7 +49,7 @@ use crate::gui::Gui;
 const APP_ID: &str = "it.salsi.xfce-niri.AutoStart";
 const APP_NAME_FALLBACK: &str = "Xfce4 niri Autostart";
 
-const APP_TAG: &str = "Xfce4NiriAutostart";
+const APP_TAG: &str = "Autostart";
 
 fn main() -> Result<(), Box<dyn Error>> {
 
