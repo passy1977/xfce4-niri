@@ -473,7 +473,9 @@ mod tests {
         }
 
         if !only_show_in.is_empty() {
-            rc.write_list_entry(c"OnlyShowIn", only_show_in);
+            // `write_list_entry` is disabled for now: a pre-joined string
+            // lands on disk the same way it would have written it.
+            rc.write_entry(c"OnlyShowIn", &only_show_in.join(";"));
         }
 
         if let Some(run_hook) = run_hook {

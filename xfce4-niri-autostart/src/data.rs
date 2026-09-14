@@ -131,3 +131,70 @@ impl Drop for Data {
         let _ = fs::remove_file(path);
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::test_support::{EnvGuard, TempDir};
+
+    #[test]
+    fn dropping_data_removes_the_service_lock_file() {
+
+        let dir = TempDir::new();
+        let mut env = EnvGuard::new();
+        env.set("XDG_RUNTIME_DIR", dir.path());
+
+        let lock_path = dir.path().join("xfce4-niri-service.lock");
+        fs::write(&lock_path, "123").unwrap();
+
+        drop(Data { xdg_home_autostart: String::new() });
+
+        assert!(!lock_path.exists());
+    }
+
+    /// Nothing to remove is not an error: the GUI can start with the service
+    /// not running at all.
+    #[test]
+    fn dropping_data_is_a_no_op_when_there_is_no_lock_file() {
+
+        let dir = TempDir::new();
+        let mut env = EnvGuard::new();
+        env.set("XDG_RUNTIME_DIR", dir.path());
+
+        let lock_path = dir.path().join("xfce4-niri-service.lock");
+        drop(Data { xdg_home_autostart: String::new() });
+
+        assert!(!lock_path.exists(), "still nothing to remove, and no panic either");
+    }
+
+    /// The mandatory, system wide autostart folder is a hard coded real path:
+    /// this test only makes a claim about the optional, per-user one, and is
+    /// skipped outright if that assumption does not hold on this machine.
+    #[test]
+    fn check_persistence_does_not_fail_when_only_the_local_autostart_dir_is_missing() {
+
+        if !Path::new(XDG_AUTOSTART).exists() {
+            return
+        }
+
+        let dir = TempDir::new();
+        let data = Data { xdg_home_autostart: dir.path().join("missing").to_string_lossy().to_string() };
+
+        assert!(data.check_persistence().is_ok());
+    }
+
+    #[test]
+    fn check_persistence_ok_when_both_autostart_dirs_exist() {
+
+        if !Path::new(XDG_AUTOSTART).exists() {
+            return
+        }
+
+        let dir = TempDir::new();
+        let data = Data { xdg_home_autostart: dir.path().to_string_lossy().to_string() };
+
+        assert!(data.check_persistence().is_ok());
+    }
+}
