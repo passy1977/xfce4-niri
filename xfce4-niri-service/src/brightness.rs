@@ -94,7 +94,7 @@ impl Brightness {
             let data: Box<BrightnessData> = Data::share().read_brightness()?;
             if data.value > 0 {
                 *current_brightness_ref = data.value;
-                let Err(_) = Self::set_brightness(&brightness_path, data) else {
+                let Ok(_) = Self::set_brightness(&brightness_path, data) else {
                     log.syslog(Self::APP_TAG, Priority::LogWarning, &format!("No found device: {}", &brightness_path.to_string_lossy()));
                     return Ok(Arc::new(()))
                 };
