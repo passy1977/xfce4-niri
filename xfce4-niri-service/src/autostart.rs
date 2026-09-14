@@ -27,17 +27,18 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use osal_rs::os::{Mutex, MutexFn, System, Thread, ThreadFn};
-use osal_rs::utils::{Error, Result};
+use osal_rs::utils::{Error, Result as OsalResult};
 use xfce4_niri_lib::exec;
 
 use crate::data::{Data, XDG_AUTOSTART};
 use crate::desktop_entry::{DESKTOP_SUFFIX, DesktopEntry, current_desktops};
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
+use xfce4_niri_lib::Result;
 
 macro_rules! merge_autostart {
     ($locale:expr, $merge:expr, $autostart:expr) => {{
         for (_, path) in $autostart {
-            let entry = DesktopEntry::read(&path)?;
+            let entry = DesktopEntry::read(&path).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
             
             let name = entry.localized("Name", $locale);
             let name = match name {
@@ -88,7 +89,7 @@ impl Autostart {
         }
     }
 
-    fn read_autostart(dir: &str) -> Result<HashMap<String, String>> {
+    fn read_autostart(dir: &str) -> OsalResult<HashMap<String, String>> {
 
         if !Path::new(dir).is_dir() {
             return Ok(HashMap::new())
@@ -166,15 +167,17 @@ impl Autostart {
                     continue
                 }
 
-                let child = exec(Self::APP_TAG, &program, &argv);
-                if let Err(_e  @ Error::NotFound) = child {
-                    log.syslog(Self::APP_TAG, Priority::LogInfo, &format!("Start: {name} - {:?} - skip", &entry.exec_argv()));
-                    continue
-                } else if let Err(e) = child {
-                    return Err(e)
-                } 
+                let child = match exec(Self::APP_TAG, &program, &argv) {
+                    Ok(child) => child,
+                    // The binary is not installed: skip it rather than failing the whole autostart pass.
+                    Err(e) if e.downcast_ref::<std::io::Error>().is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound) => {
+                        log.syslog(Self::APP_TAG, Priority::LogInfo, &format!("Start: {name} - {:?} - skip", &entry.exec_argv()));
+                        continue
+                    }
+                    Err(e) => return Err(Error::UnhandledOwned(e.to_string())),
+                };
                 log.syslog(Self::APP_TAG, Priority::LogDebug, &format!("Start: {name} - {:?} - ok", &entry.exec_argv()));
-                data.lock()?.children.push(child.unwrap());
+                data.lock()?.children.push(child);
             }
 
             loop {

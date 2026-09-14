@@ -28,7 +28,8 @@ use crate::lock::Lock;
 use crate::syslog::{Options, Priority, SysLog};
 
 use osal_rs::os::{Thread, ThreadFn};
-use osal_rs::utils::{Error, Result};
+
+use crate::Result;
 
 pub type OnRequest = dyn Fn(&[String]) -> Result<()> + Send + Sync + 'static;
 
@@ -68,31 +69,32 @@ impl Socket {
     pub fn start_server(&mut self, on_request: &'static OnRequest) -> Result<()> {
 
         let Some(parent) = self.unix_socket.parent() else {
-            return Err(Error::UnhandledOwned("invalid socket file path".into()))
+            return Err("invalid socket file path".into())
         };
 
-        fs::create_dir_all(parent).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        fs::create_dir_all(parent)?;
 
         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 
         let path = self.unix_socket.clone();
 
         if path.exists() {
-            match UnixStream::connect(&path) {
+            let result: Result<()> = match UnixStream::connect(&path) {
                 // Somebody answered: this is a running server, so do not touch it.
-                Ok(_) => Err(Error::UnhandledOwned(format!("a server is already listening on {}", path.display()))),
+                Ok(_) => Err(format!("a server is already listening on {}", path.display()).into()),
                 // Nobody is listening on it any more - the node is stale.
-                Err(e) if e.kind() == ErrorKind::ConnectionRefused => fs::remove_file(&path).map_err(|e| Error::UnhandledOwned(e.to_string())),
-                Err(e) => Err( Error::UnhandledOwned(e.to_string()))
-            }?;
+                Err(e) if e.kind() == ErrorKind::ConnectionRefused => fs::remove_file(&path).map_err(|e| e.into()),
+                Err(e) => Err(e.into())
+            };
+            result?;
         }
 
         log.syslog(Self::APP_TAG, Priority::LogDebug, &format!("listening on {}", path.display()));
 
         self.thread.spawn_simple(move || {
-            let listener = UnixListener::bind(&path).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+            let listener = UnixListener::bind(&path)?;
 
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
 
 
             let _guard = SocketGuard(path.clone());
@@ -126,7 +128,7 @@ impl Socket {
         let reader = BufReader::new(stream);
 
         for line in reader.lines() {
-            let line = line.map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+            let line = line?;
             let args: Vec<String> = line
                                         .trim()
                                         .splitn(Self::MAX_PARAM_SPLIT, ' ')
@@ -136,8 +138,8 @@ impl Socket {
 
             on_request(&args)?;
 
-            writeln!(writer, "{}", Self::REPLY_OK).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-            writer.flush().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+            writeln!(writer, "{}", Self::REPLY_OK)?;
+            writer.flush()?;
         }
 
 
@@ -148,20 +150,20 @@ impl Socket {
     pub fn run_client(&self, commands: &[String]) -> Result<()> {
 
         let stream = UnixStream::connect(&self.unix_socket)
-            .map_err(|e| Error::UnhandledOwned(format!("cannot connect to {}: {e} (is the service running?)", self.unix_socket.display())))?;
+            .map_err(|e| format!("cannot connect to {}: {e} (is the service running?)", self.unix_socket.display()))?;
 
-        let mut writer = stream.try_clone().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let mut writer = stream.try_clone()?;
         let mut reader = BufReader::new(stream);
 
         let command = commands.join(" ");
 
 
-        writeln!(writer, "{command}").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-        writer.flush().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        writeln!(writer, "{command}")?;
+        writer.flush()?;
 
         let mut reply = String::new();
-        if reader.read_line(&mut reply).map_err(|e| Error::UnhandledOwned(e.to_string()))? == 0 {
-            return Err(Error::UnhandledOwned("server closed the connection".into()));
+        if reader.read_line(&mut reply)? == 0 {
+            return Err("server closed the connection".into());
         }
 
         println!("{}", reply.trim_end());

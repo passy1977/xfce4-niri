@@ -26,11 +26,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use osal_rs::os::{Mutex, MutexFn, System, Thread, ThreadFn, ThreadParam};
-use osal_rs::utils::{Error, Result};
+use osal_rs::utils::{Error, Result as OsalResult};
 use osal_rs_serde::{Deserialize, Serialize};
 
 use crate::data::Data;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
+use xfce4_niri_lib::Result;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct BrightnessData {
@@ -123,26 +124,26 @@ impl Brightness {
         Ok(())
     }
 
-    fn get_brightness(brightness_path: &PathBuf) -> Result<i32> {
+    fn get_brightness(brightness_path: &PathBuf) -> OsalResult<i32> {
 
-        let brightness_path = fs::read_to_string(&brightness_path).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-        
+        let brightness_path = fs::read_to_string(&brightness_path)?;
+
         Ok(
             brightness_path
             .trim()
             .parse()
             .map_err(
-                |e: ParseIntError| Error::UnhandledOwned(e.to_string()) 
+                |e: ParseIntError| Error::UnhandledOwned(e.to_string())
             )?
         )
     }
 
-    fn set_brightness(brightness_path: &PathBuf, value: Box<BrightnessData>) -> Result<()> {
+    fn set_brightness(brightness_path: &PathBuf, value: Box<BrightnessData>) -> OsalResult<()> {
         if brightness_path.to_string_lossy() != value.device {
             return Ok(())
         }
 
-        fs::write(brightness_path, value.value.to_le_bytes()).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        fs::write(brightness_path, value.value.to_le_bytes())?;
         Ok(())
     }
 

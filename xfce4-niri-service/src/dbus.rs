@@ -28,15 +28,16 @@ use dbus::blocking::SyncConnection;
 use dbus::blocking::stdintf::org_freedesktop_dbus::{Properties, PropertiesPropertiesChanged};
 use dbus::message::SignalArgs;
 use osal_rs::os::{Thread, ThreadFn, Mutex, MutexFn};
-use osal_rs::utils::{Error, Result};
 
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
+use xfce4_niri_lib::Result;
+
 
 macro_rules! handle_power_source_error {
     ($msg:expr) => {{
         let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
         log.syslog(Self::APP_TAG, Priority::LogWarning, $msg);
-        Error::UnhandledOwned($msg.to_string())
+        Box::<dyn std::error::Error + Send + Sync>::from($msg.to_string())
     }};
 }
 
@@ -97,8 +98,8 @@ pub(crate) struct DBus {
     pub(crate) fn new() -> Result<Self> {
 
         // xfconf is a per-session service, UPower is a system service.
-        let conn = SyncConnection::new_session().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-        let system_conn = SyncConnection::new_system().map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let conn = SyncConnection::new_session()?;
+        let system_conn = SyncConnection::new_system()?;
 
         conn.set_signal_match_mode(true);
         system_conn.set_signal_match_mode(true);
@@ -124,13 +125,13 @@ pub(crate) struct DBus {
 
         // OnBattery lives on the manager interface, the rest on the device one.
         let upower = conn.with_proxy(dest, path, Self::TIMEOUT);
-        let battery_or_ac: bool = upower.get(iface, "OnBattery").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let battery_or_ac: bool = upower.get(iface, "OnBattery")?;
         let battery_or_ac = !battery_or_ac;
 
         let device = conn.with_proxy(dest, device_path, Self::TIMEOUT);
-        let device_type: u32 = device.get(device_iface, "Type").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-        let is_present: bool = device.get(device_iface, "IsPresent").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-        let state: u32 = device.get(device_iface, "State").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let device_type: u32 = device.get(device_iface, "Type")?;
+        let is_present: bool = device.get(device_iface, "IsPresent")?;
+        let state: u32 = device.get(device_iface, "State")?;
         let has_battery = is_present && device_type == DEVICE_TYPE_BATTERY;
 
         Ok((battery_or_ac, has_battery, state))
@@ -151,7 +152,7 @@ pub(crate) struct DBus {
         let initial: T = match xfconf.method_call::<(Variant<Box<dyn RefArg>>,), _, _, _>("org.xfce.Xfconf", "GetProperty", (channel, property)) {
             Ok((value,)) => T::from_refarg(&*value.0).unwrap_or_default(),
             Err(e) => {
-                handle_power_source_error!(&format!("[{channel}]{property} not set yet ({e})"));
+                let _ = handle_power_source_error!(&format!("[{channel}]{property} not set yet ({e})"));
                 T::default()
             }
         };
@@ -169,7 +170,7 @@ pub(crate) struct DBus {
                 }
             }
             true
-        }).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        })?;
 
         Ok(())
     }
@@ -186,7 +187,7 @@ pub(crate) struct DBus {
 
 
         let upower = self.upower_conn.with_proxy(dest, path, Self::TIMEOUT);
-        let (device_path,): (dbus::Path,) = upower.method_call(iface, "GetDisplayDevice", ()).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let (device_path,): (dbus::Path,) = upower.method_call(iface, "GetDisplayDevice", ())?;
         let device_path = device_path.to_string();
 
         let manager_rule = PropertiesPropertiesChanged::match_rule(
@@ -217,7 +218,7 @@ pub(crate) struct DBus {
             
             }
             true
-        }).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        })?;
 
         let device_rule = PropertiesPropertiesChanged::match_rule(
             Some(&dest.into()),
@@ -242,7 +243,7 @@ pub(crate) struct DBus {
                     
             }
             true
-        }).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        })?;
 
         Ok(())
     }

@@ -23,8 +23,8 @@ use std::env;
 use std::fs::read_to_string;
 use std::path::Path;
 
-use osal_rs::utils::{Error, Result};
 use xfce4_niri_lib::models::run_hook::RunHook;
+use xfce4_niri_lib::Result;
 
 pub(crate) const DESKTOP_SUFFIX: &str = ".desktop";
 
@@ -57,7 +57,7 @@ impl DesktopEntry {
     const GROUP: &str = "[Desktop Entry]";
 
     pub(crate) fn read(file: &str) -> Result<Self> {
-        let content = read_to_string(file).map_err(|e| Error::UnhandledOwned(format!("{file}: {e}")))?;
+        let content = read_to_string(file).map_err(|e| format!("{file}: {e}"))?;
 
         Ok(Self::parse(&content))
     }

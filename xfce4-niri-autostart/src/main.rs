@@ -30,7 +30,6 @@ mod xfce;
 mod test_support;
 
 use std::cell::RefCell;
-use std::error::Error;
 use std::ffi::c_int;
 use std::rc::Rc;
 
@@ -42,6 +41,7 @@ use gtk::traits::{WidgetExt, ContainerExt};
 use osal_rs::os::{Mutex, MutexFn};
 use xfce4_niri_lib::niri::Niri;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
+use xfce4_niri_lib::Result;
 
 use crate::data::Data;
 use crate::gui::Gui;
@@ -51,7 +51,7 @@ const APP_NAME_FALLBACK: &str = "Xfce4 niri Autostart";
 
 const APP_TAG: &str = "Autostart";
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<()> {
 
     let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
 

@@ -25,7 +25,7 @@ use std::path::PathBuf;
 use std::fs::{File, OpenOptions};
 use std::io::{Error as IoError, Read};
 
-use osal_rs::utils::{Error, Result};
+use crate::Result;
 
 pub struct Lock {
     path: PathBuf,
@@ -54,20 +54,19 @@ impl Lock {
         
         let lock_file = crate::get_safe_path(file_name)?;
         
-        let mut file = OpenOptions::new().create(true).read(true).write(true).open(&lock_file)
-            .map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let mut file = OpenOptions::new().create(true).read(true).write(true).open(&lock_file)?;
 
         if unsafe { ffi::flock(file.as_raw_fd(), Self::LOCK_EX | Self::LOCK_NB) } != 0 {
             let mut locked_by_id = String::new();
-            file.read_to_string(&mut  locked_by_id).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+            file.read_to_string(&mut locked_by_id)?;
             if let Some(locked_by) = locked_by {
                 *locked_by = locked_by_id.clone();
             }
-            return Err(Error::UnhandledOwned(format!("Another instance running, pid:{locked_by_id}")));
+            return Err(format!("Another instance running, pid:{locked_by_id}").into());
         }
 
-        file.set_len(0).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
-        file.write_fmt(format_args!("{pid}", pid = process::id())).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        file.set_len(0)?;
+        file.write_fmt(format_args!("{pid}", pid = process::id()))?;
 
         Ok(
             Self {
@@ -82,19 +81,18 @@ impl Lock {
             Some(self.path.to_str().unwrap_or(Self::LOCK_FILE))
         )?;
 
-        let mut file = OpenOptions::new().read(true).write(true).open(&lock_file)
-            .map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let mut file = OpenOptions::new().read(true).write(true).open(&lock_file)?;
 
         if unsafe { ffi::flock(file.as_raw_fd(), Self::LOCK_EX | Self::LOCK_NB) } != 0 {
             let err = IoError::last_os_error();
             return match err.raw_os_error() {
                 Some(Self::EWOULDBLOCK) => {
                     if let Some(locked_by) = locked_by {
-                        file.read_to_string(locked_by).map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+                        file.read_to_string(locked_by)?;
                     }
                     Ok(true)
                 }
-                _ => Err(Error::UnhandledOwned(err.to_string())),
+                _ => Err(err.into()),
             };
         }
         

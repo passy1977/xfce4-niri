@@ -34,10 +34,11 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::{env, fs};
 
-use osal_rs::utils::{Error, Result};
-
 use crate::lock::Lock;
 use crate::syslog::{Options, Priority, SysLog};
+
+pub type Result<T, E = Box<dyn std::error::Error + Send + Sync>> = std::result::Result<T, E>;
+
 
 fn is_program(path: impl AsRef<Path>) -> bool {
 
@@ -101,7 +102,7 @@ pub fn get_safe_path(file_name: Option<&str>) -> Result<PathBuf> {
     };
 
     if !path.exists() {
-        fs::create_dir(&path).map_err( |e| Error::UnhandledOwned(e.to_string()))?;
+        fs::create_dir(&path)?;
     }
 
     Ok(path.join(file_name.unwrap_or(Lock::LOCK_FILE)))
@@ -112,14 +113,15 @@ pub fn exec(tag: &str, program: &String, args: &[String]) -> Result<Child> {
     let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);
     log.syslog(tag, Priority::LogDebug, &format!("Executing: {program} {:?}", args));
 
-    Command::new(program)
+    Ok(Command::new(program)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .spawn()
-        .map_err(|e| Error::UnhandledOwned(e.to_string()))
+        .spawn()?)
 }
+
+
 
 
 #[cfg(test)]

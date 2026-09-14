@@ -26,8 +26,9 @@ use std::sync::Arc;
 use osal_rs::access_static_option;
 use osal_rs::os::types::{EventBits, TickType};
 use osal_rs::os::{EventGroup, EventGroupFn, Mutex, MutexFn, MutexGuard, Thread, ThreadFn, ThreadParam};
-use osal_rs::utils::{Error, Result};
+use osal_rs::utils::Error;
 use xfce4_niri_lib::exec;
+use xfce4_niri_lib::Result;
 
 use crate::data::Data;
 use crate::dbus::DBus;
@@ -159,7 +160,7 @@ impl LockScreen {
 
 
         let Ok(data) = self.data.lock() else {
-            return Err(Error::Unhandled("Failed to lock data mutex"))
+            return Err(Error::Unhandled("Failed to lock data mutex").into())
         };
 
         if data.is_desktop {
@@ -325,11 +326,11 @@ impl LockScreen {
 
 
         let Ok(exit_status) = child.wait() else {
-            return Err(Error::Unhandled("Failed to wait for command"))
+            return Err("Failed to wait for command".into())
         };
 
         if !exit_status.success() {
-            Err(Error::Unhandled("Command exited with non-zero status"))
+            Err("Command exited with non-zero status".into())
         } else {
             Ok(child)
         }

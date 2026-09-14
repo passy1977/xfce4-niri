@@ -37,7 +37,7 @@ use std::env;
 use std::{error::Error, ffi::c_int};
 
 use osal_rs::os::{System, SystemFn};
-use osal_rs::utils::Result as OsalResult;
+use xfce4_niri_lib::Result as LibResult;
 #[cfg(not(feature = "disable_autostart"))]
 use crate::autostart::Autostart;
 use crate::data::Data;
@@ -50,7 +50,7 @@ use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 const APP_TAG: &str = "Service";
 
-fn handle_request(request: &[String]) -> OsalResult<()>{
+fn handle_request(request: &[String]) -> LibResult<()>{
     let mut count = 0;
     for str in request {
         if count == 0 {
