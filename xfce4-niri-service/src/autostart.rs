@@ -194,3 +194,44 @@ impl Autostart {
         Ok(())
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use xfce4_niri_lib::test_support::TempDir;
+
+    #[test]
+    fn read_autostart_is_empty_for_a_missing_directory() {
+
+        let dir = TempDir::new();
+
+        assert_eq!(Autostart::read_autostart(dir.path().join("nope").to_str().unwrap()).unwrap(), HashMap::new());
+    }
+
+    #[test]
+    fn read_autostart_keeps_only_dot_desktop_files() {
+
+        let dir = TempDir::new();
+        let entry = dir.file("app.desktop", 0o644);
+        dir.file("README", 0o644);
+        dir.file("app.desktop.bak", 0o644);
+
+        let found = Autostart::read_autostart(dir.path().to_str().unwrap()).unwrap();
+
+        assert_eq!(found.len(), 1);
+        assert_eq!(found.get("app.desktop").map(String::as_str), entry.to_str());
+    }
+
+    /// A path that exists but is a file, not a directory, is treated the same
+    /// as a missing one rather than erroring out.
+    #[test]
+    fn read_autostart_is_empty_for_a_file_path() {
+
+        let dir = TempDir::new();
+        let file = dir.file("not-a-dir", 0o644);
+
+        assert_eq!(Autostart::read_autostart(file.to_str().unwrap()).unwrap(), HashMap::new());
+    }
+}

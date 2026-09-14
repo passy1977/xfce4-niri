@@ -67,6 +67,35 @@ fn handle_request(request: &[String]) -> LibResult<()>{
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use xfce4_niri_lib::test_support::EnvGuard;
+
+    #[test]
+    fn handle_request_is_a_no_op_for_an_empty_request() {
+        assert!(handle_request(&[]).is_ok());
+    }
+
+    #[test]
+    fn handle_request_ignores_unknown_commands() {
+        assert!(handle_request(&["unknown".to_string(), "arg".to_string()]).is_ok());
+    }
+
+    /// Without a session there is nothing to lock: `perform_lock_screen` must
+    /// not be reached, since it would otherwise touch the process-wide `Data`
+    /// singleton and spawn a real command.
+    #[test]
+    fn handle_request_skips_lock_screen_without_a_session() {
+
+        let mut env = EnvGuard::new();
+        env.unset("XDG_SESSION_ID");
+
+        assert!(handle_request(&["lock_screen".to_string()]).is_ok());
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
 
     let log = SysLog::open(Options::LogPid as c_int | Options::LogNDelay as c_int);

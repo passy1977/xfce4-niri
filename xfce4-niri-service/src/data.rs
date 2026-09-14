@@ -271,5 +271,73 @@ impl Data {
     pub(crate) fn read_brightness(&self) -> Result<Box<BrightnessData>>  {
         Self::read_file::<BrightnessData>(&self.brightness_file)
     }
-    
+
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use xfce4_niri_lib::test_support::TempDir;
+
+    /// A `Data` whose files live under `dir`, without ever touching the
+    /// process-wide `Data::share()` singleton.
+    fn data_in(dir: &TempDir) -> Data {
+        Data { brightness_file: dir.path().join("brightness").to_string_lossy().to_string(), ..Default::default() }
+    }
+
+    #[test]
+    fn read_directory_lists_every_entry() {
+
+        let dir = TempDir::new();
+        dir.file("a", 0o644);
+        dir.file("b", 0o644);
+
+        let mut names: Vec<String> = Data::read_directory(dir.path().to_str().unwrap())
+            .unwrap()
+            .into_iter()
+            .map(|it| it.file_name().to_string_lossy().to_string())
+            .collect();
+        names.sort();
+
+        assert_eq!(names, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn read_directory_fails_for_a_missing_directory() {
+
+        let dir = TempDir::new();
+        assert!(Data::read_directory(dir.path().join("nope").to_str().unwrap()).is_err());
+    }
+
+    /// No file yet is not an error: it reads back as the type's default.
+    #[test]
+    fn read_brightness_does_not_fail_when_the_file_is_missing() {
+
+        let dir = TempDir::new();
+        let data = data_in(&dir);
+
+        assert!(data.read_brightness().is_ok());
+    }
+
+    #[test]
+    fn write_brightness_fails_when_the_parent_folder_is_missing() {
+
+        let dir = TempDir::new();
+        let mut data = data_in(&dir);
+        data.brightness_file = dir.path().join("missing-dir").join("brightness").to_string_lossy().to_string();
+
+        assert!(data.write_brightness(BrightnessData::default()).is_err());
+    }
+
+    #[test]
+    fn write_brightness_fails_when_the_target_is_a_directory() {
+
+        let dir = TempDir::new();
+        let mut data = data_in(&dir);
+        data.brightness_file = dir.dir("brightness").to_string_lossy().to_string();
+
+        assert!(data.write_brightness(BrightnessData::default()).is_err());
+    }
 }

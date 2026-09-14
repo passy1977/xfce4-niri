@@ -276,3 +276,42 @@ pub(crate) struct DBus {
         Ok(())
     }
  }
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn u64_from_refarg_reads_the_unsigned_integer_types() {
+
+        assert_eq!(u64::from_refarg(&42u64), Some(42));
+        assert_eq!(u64::from_refarg(&7u32), Some(7));
+        assert_eq!(u64::from_refarg(&3u8), Some(3));
+    }
+
+    /// D-Bus signed integers have no `as_u64`: xfconf can hand back a signed
+    /// type for a property this code expects as unsigned, and that has to
+    /// read as "no value" rather than a wrapped/garbage number.
+    #[test]
+    fn u64_from_refarg_is_none_for_signed_integers_and_non_numbers() {
+
+        assert_eq!(u64::from_refarg(&5i32), None);
+        assert_eq!(u64::from_refarg(&5i64), None);
+        assert_eq!(u64::from_refarg(&"5".to_string()), None);
+    }
+
+    #[test]
+    fn bool_from_refarg_treats_any_nonzero_value_as_true() {
+
+        assert_eq!(bool::from_refarg(&0u64), Some(false));
+        assert_eq!(bool::from_refarg(&1u64), Some(true));
+        assert_eq!(bool::from_refarg(&5u64), Some(true), "any nonzero value is true, not just 1");
+    }
+
+    #[test]
+    fn bool_from_refarg_is_none_when_the_value_is_not_a_number() {
+        assert_eq!(bool::from_refarg(&"true".to_string()), None);
+    }
+}

@@ -143,8 +143,99 @@ impl Brightness {
             return Ok(())
         }
 
-        fs::write(brightness_path, value.value.to_le_bytes())?;
+        fs::write(brightness_path, value.value.to_string())?;
         Ok(())
     }
 
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use xfce4_niri_lib::test_support::TempDir;
+    use crate::data::Data;
+
+    /// A `Data` whose brightness file lives under `dir`, without ever
+    /// touching the process-wide `Data::share()` singleton.
+    fn data_in(dir: &TempDir) -> Data {
+        Data { brightness_file: dir.path().join("brightness.bin").to_string_lossy().to_string(), ..Default::default() }
+    }
+
+    #[test]
+    fn write_then_read_brightness_round_trips_through_data() {
+
+        let dir = TempDir::new();
+        let data = data_in(&dir);
+
+        data.write_brightness(BrightnessData { device: "eDP-1".to_string(), value: 42 }).unwrap();
+
+        let read = data.read_brightness().unwrap();
+        assert_eq!(read.device, "eDP-1");
+        assert_eq!(read.value, 42);
+    }
+
+    /// No file yet is not an error: it reads back as the type's default.
+    #[test]
+    fn read_brightness_defaults_when_the_file_is_missing() {
+
+        let dir = TempDir::new();
+        let data = data_in(&dir);
+
+        let read = data.read_brightness().unwrap();
+        assert_eq!(read.value, BrightnessData::default().value);
+    }
+
+    fn brightness_data(device: &PathBuf, value: i32) -> Box<BrightnessData> {
+        Box::new(BrightnessData { device: device.to_string_lossy().to_string(), value })
+    }
+
+    #[test]
+    fn get_brightness_parses_the_trimmed_file_content() {
+
+        let dir = TempDir::new();
+        let path = dir.path().join("brightness");
+        fs::write(&path, "  42\n").unwrap();
+
+        assert_eq!(Brightness::get_brightness(&path).unwrap(), 42);
+    }
+
+    #[test]
+    fn get_brightness_fails_on_non_numeric_content() {
+
+        let dir = TempDir::new();
+        let path = dir.path().join("brightness");
+        fs::write(&path, "not a number").unwrap();
+
+        assert!(Brightness::get_brightness(&path).is_err());
+    }
+
+    #[test]
+    fn set_brightness_writes_the_value_when_the_device_matches() {
+
+        let dir = TempDir::new();
+        let path = dir.path().join("brightness");
+        fs::write(&path, "0").unwrap();
+
+        Brightness::set_brightness(&path, brightness_data(&path, 77)).unwrap();
+
+        assert_eq!(Brightness::get_brightness(&path).unwrap(), 77);
+    }
+
+    /// The stored device may no longer be the one under `brightness_path`
+    /// (unplugged, renumbered): writing to the wrong device is refused, not
+    /// silently redirected.
+    #[test]
+    fn set_brightness_is_a_no_op_when_the_device_does_not_match() {
+
+        let dir = TempDir::new();
+        let path = dir.path().join("brightness");
+        fs::write(&path, "0").unwrap();
+
+        let other_device = dir.path().join("other-device");
+        Brightness::set_brightness(&path, brightness_data(&other_device, 77)).unwrap();
+
+        assert_eq!(Brightness::get_brightness(&path).unwrap(), 0);
+    }
 }

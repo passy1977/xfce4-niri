@@ -29,3 +29,8 @@ xfce4-niri-lib = { version = "0", path = "../xfce4-niri-lib" }
 osal-rs = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["posix", "serde"]}
 osal-rs-serde = { git = "https://github.com/HiHappyGarden/osal-rs.git", features = ["derive"]}
 dbus = "0.9"
+
+[dev-dependencies]
+# The unit tests reach for the helpers behind `test-support`; the feature
+# stays off in a normal build.
+xfce4-niri-lib = { path = "../xfce4-niri-lib", features = ["test-support"] }

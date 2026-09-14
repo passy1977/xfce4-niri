@@ -350,3 +350,53 @@ impl LockScreen {
     }
 
  }
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn kill_lock_screen_command_takes_and_kills_the_child() {
+
+        let child = Command::new("sleep").arg("30").spawn().expect("cannot spawn sleep");
+        let pid = child.id();
+
+        let holder = Mutex::new_arc(Some(child));
+        let mut guard = holder.lock().unwrap();
+
+        LockScreen::kill_lock_screen_command(&mut guard);
+
+        assert!(guard.is_none(), "the child must be taken out of the slot");
+
+        // Nobody `wait()`s the child afterwards, so it lingers as a zombie in
+        // `/proc` rather than disappearing: check its state, not its presence.
+        fn is_running(pid: u32) -> bool {
+            let Ok(stat) = std::fs::read_to_string(format!("/proc/{pid}/stat")) else {
+                return false;
+            };
+            let Some((_, after_comm)) = stat.rsplit_once(')') else { return false };
+            after_comm.trim_start().chars().next().is_some_and(|state| state != 'Z')
+        }
+
+        for _ in 0..50 {
+            if !is_running(pid) {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        panic!("process {pid} is still alive after being killed");
+    }
+
+    #[test]
+    fn kill_lock_screen_command_is_a_no_op_when_there_is_nothing_to_kill() {
+
+        let holder: Arc<Mutex<Option<Child>>> = Mutex::new_arc(None);
+        let mut guard = holder.lock().unwrap();
+
+        LockScreen::kill_lock_screen_command(&mut guard);
+
+        assert!(guard.is_none());
+    }
+}
