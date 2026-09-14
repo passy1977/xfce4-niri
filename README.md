@@ -75,6 +75,28 @@ This:
 Options: `./install.sh --help` (`--debug` for a debug build, `--bin-dir DIR` to
 override the binaries directory, `-y`/`--yes` to skip the overwrite prompt).
 
+## xfce4-niri-autostart
+
+`niri` does not process `~/.config/autostart/*.desktop` the way a full
+session manager does, so `xfce4-niri-autostart` is a standalone GTK
+re-implementation of xfce4-session's "Application Autostart" tab, letting you
+manage autostart entries the same way you would on stock Xfce.
+
+![xfce4-niri-autostart](media/xfce4-niri-autostart.png)
+
+- **Program list** — every autostart entry (icon, name and comment), each
+  with a checkbox to enable/disable it; hovering a row shows the exact
+  command it runs in a tooltip (e.g. `flatpak run com.borgbase.Vorta
+  --daemonize`).
+- **Toolbar (Add / Remove / Edit)** — add a new autostart entry, remove one,
+  or edit an existing entry's name, description and command.
+- **Close** — dismisses the window; changes are written to the underlying
+  `.desktop` file as soon as they're made, so nothing needs to be saved
+  explicitly.
+
+Launch it with `Mod+A` (see [niri's
+keybindings](xfce4-niri-config/niri/README.md#keybindings)).
+
 ## Dependencies
 
 ### Build
