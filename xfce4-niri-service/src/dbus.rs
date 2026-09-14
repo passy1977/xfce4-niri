@@ -125,6 +125,7 @@ pub(crate) struct DBus {
         // OnBattery lives on the manager interface, the rest on the device one.
         let upower = conn.with_proxy(dest, path, Self::TIMEOUT);
         let battery_or_ac: bool = upower.get(iface, "OnBattery").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
+        let battery_or_ac = !battery_or_ac;
 
         let device = conn.with_proxy(dest, device_path, Self::TIMEOUT);
         let device_type: u32 = device.get(device_iface, "Type").map_err(|e| Error::UnhandledOwned(e.to_string()))?;
