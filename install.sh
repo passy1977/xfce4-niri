@@ -17,6 +17,7 @@ cd "$SCRIPT_DIR"
 PROFILE=release
 ASSUME_YES=0
 BIN_DIR_OVERRIDE=""
+SKIP_TESTS=0
 
 usage() {
     cat <<EOF
@@ -25,6 +26,7 @@ Usage: $(basename "$0") [options]
 Options:
   --debug         build in debug mode instead of release
   --bin-dir DIR   install binaries into DIR instead of auto-detecting
+  --skip-tests    skip running the test suite before building
   -y, --yes       overwrite an existing ~/.config/niri without asking
   -h, --help      show this help
 EOF
@@ -34,6 +36,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --debug) PROFILE=debug ;;
         --bin-dir) BIN_DIR_OVERRIDE="${2:?--bin-dir requires an argument}"; shift ;;
+        --skip-tests) SKIP_TESTS=1 ;;
         -y|--yes) ASSUME_YES=1 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
@@ -73,6 +76,13 @@ fi
 
 CONFIG_DIR="$HOME/.config/niri"
 APPS_DIR="$HOME/.local/share/applications"
+
+if [ "$SKIP_TESTS" -ne 1 ]; then
+    echo "==> Running test suite"
+    cargo test --workspace
+else
+    echo "==> Skipping test suite (--skip-tests)"
+fi
 
 echo "==> Building workspace (--$PROFILE)"
 if [ "$PROFILE" = release ]; then
