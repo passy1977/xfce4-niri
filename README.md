@@ -3,7 +3,7 @@ A utility to better integrate Xfce4 applications with the niri window manager, c
 
 ## Install
 
-Debian package
+Debian packages
 ```sh
 sudo apt install \
     pkg-config \
@@ -25,12 +25,12 @@ sudo apt install \
     xfce4-settings \
     xfce4-whiskermenu-plugin \
     thunar \
-    alacrity
+    alacritty
 ```
 
 `niri` is not packaged in Debian/Ubuntu's default repositories yet; install it from your distro's community repo or build it from [source](https://github.com/YaLTeR/niri). Rust (`rustc`/`cargo` >= 1.85) should be installed via [rustup](https://rustup.rs) rather than `apt`, since distro packages usually lag behind the required version.
 
-Void Linux package
+Void Linux packages
 ```sh
 sudo xbps-install -S \
     pkg-config \
@@ -57,8 +57,8 @@ sudo xbps-install -S \
     xfce4-settings \
     xfce4-whiskermenu-plugin \
     thunar \
-    alacrity \
-    niri 
+    alacritty \
+    niri
 ```
 
 ## Build & install
@@ -70,7 +70,7 @@ everything for the current user (no root needed) with:
 ./install.sh
 ```
 
-This:
+This script:
 - builds `xfce4-niri`, `xfce4-niri-service`, `xfce4-niri-autostart` (`cargo build --workspace --release`)
 - installs the binaries into `~/.local/bin` (or `~/bin`, whichever is already on `$PATH`)
 - installs [xfce4-niri-config/niri](xfce4-niri-config/niri) into `~/.config/niri`, backing up an existing one first
@@ -82,25 +82,25 @@ override the binaries directory, `-y`/`--yes` to skip the overwrite prompt).
 ## xfce4-niri-service
 
 `xfce4-niri-service` is the background daemon that replaces the pieces of
-`xfce4-session`/`xfce4-power-manager` niri doesn't provide on its own,
+`xfce4-session`/`xfce4-power-manager` that niri doesn't provide on its own,
 keeping a single instance running (via a lock file) for the whole session.
 It:
 
 - **Brightness** — watches the backlight device and persists/restores the
   screen brightness across sessions.
 - **Lock screen** — integrates with `swaylock`/`swayidle` and honors
-  XFCE's presentation-mode setting (via D-Bus/xfconf), so idle-locking is
+  XFCE's presentation-mode setting (via D-Bus/xfconf), so idle locking is
   suspended during presentations just like on stock Xfce.
 - **Power management** — talks to `xfce4-power-manager` and `UPower` over
   D-Bus to react to power-source and presentation-mode changes.
 - **Autostart** — launches the `~/.config/autostart/*.desktop` entries
-  that niri doesn't process itself.
+  that niri doesn't process on its own.
 - **Unix socket** — exposes a small control socket (used e.g. by `xfce4-niri`
   to request `lock_screen`) for other components to talk to the running
   service.
 
 The idle timeout before the screen is locked is read from Xfce4 Power
-Manager, so you can tune it from the usual settings dialog: open
+Manager, so you can adjust it from the usual settings dialog: open
 **Xfce4 Power Manager → Display**, then set **Switch off after** under
 *On Battery* and/or *Plugged in*.
 
@@ -110,7 +110,7 @@ Manager, so you can tune it from the usual settings dialog: open
 
 `niri` does not process `~/.config/autostart/*.desktop` the way a full
 session manager does, so `xfce4-niri-autostart` is a standalone GTK
-re-implementation of xfce4-session's "Application Autostart" tab, letting you
+reimplementation of xfce4-session's "Application Autostart" tab, letting you
 manage autostart entries the same way you would on stock Xfce.
 
 ![xfce4-niri-autostart](media/xfce4-niri-autostart.png)
@@ -121,16 +121,17 @@ manage autostart entries the same way you would on stock Xfce.
   --daemonize`).
 - **Toolbar (Add / Remove / Edit)** — add a new autostart entry, remove one,
   or edit an existing entry's name, description and command.
-- **Close** — dismisses the window; changes are written to the underlying
-  `.desktop` file as soon as they're made, so nothing needs to be saved
+- **Close** — dismisses the window. Changes are written to the underlying
+  `.desktop` file as soon as they are made, so nothing needs to be saved
   explicitly.
 
-Launch it with `Mod+A` (see [niri's
-keybindings](xfce4-niri-config/niri/README.md#keybindings)).
+## niri's keybindings
+
+For the preconfigured keys, see [niri's
+keybindings](xfce4-niri-config/niri/README.md#keybindings).
 
 ## Reference
-The niri configuration is inspired by [
-JakeAtLinux
-/
-Niri
-](https://codeberg.org/JakeAtLinux/Niri=) for details goes there
+
+The niri configuration is inspired by
+[JakeAtLinux/Niri](https://codeberg.org/JakeAtLinux/Niri); see that
+repository for details.
