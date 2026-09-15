@@ -23,7 +23,8 @@ sudo apt install \
     xfce4-notifyd \
     xfce4-pulseaudio-plugin \
     xfce4-settings \
-    xfce4-whiskermenu-plugin
+    xfce4-whiskermenu-plugin \
+    alacrity
 ```
 
 `niri` is not packaged in Debian/Ubuntu's default repositories yet; install it from your distro's community repo or build it from [source](https://github.com/YaLTeR/niri). Rust (`rustc`/`cargo` >= 1.85) should be installed via [rustup](https://rustup.rs) rather than `apt`, since distro packages usually lag behind the required version.
@@ -54,7 +55,8 @@ sudo xbps-install -S \
     xfce4-pulseaudio-plugin \
     xfce4-settings \
     xfce4-whiskermenu-plugin \
-    niri
+    alacrity \
+    niri 
 ```
 
 ## Build & install
@@ -130,3 +132,10 @@ xfce4-power-manager-4.20
 xfce4-pulseaudio-plugin
 xfce4-settings-4.20
 xfce4-whiskermenu-plugin
+
+## Reference
+The niri configuration is inspired by [
+JakeAtLinux
+/
+Niri
+](https://codeberg.org/JakeAtLinux/Niri=) for details goes there

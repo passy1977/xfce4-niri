@@ -12,12 +12,10 @@ binds {
     Mod+Return hotkey-overlay-title="Open a Terminal: alacritty" { spawn "alacritty"; }
     Mod+Space hotkey-overlay-title="Run an Application: xfce4-appfinder" { spawn "xfce4-appfinder"; }
 
-    // Lock the screen (styled config in ../swaylock/config, which sets
-    // `daemonize`). The same config is also used by the swayidle
+    // Lock the screen (styled config in ../swaylock/config, which sets `daemonize`). The same config is also used by the swayidle
     // auto-lock in ./bin/lockscreen, spawned in niri.d/50-startup.kdl.
     // Skipped while presentation mode is on, same as the idle auto-lock.
     Mod+Shift+Escape hotkey-overlay-title="Lock the Screen: swaylock" { spawn-sh "[ \"$(xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/presentation-mode)\" != true ] && swaylock -C /home/antoniosalsi/.config/niri/swaylock/config"; }
-    Ctrl+Shift+Escape repeat=false hotkey-overlay-title="MissionCenter" { spawn "flatpak" "run" "io.missioncenter.MissionCenter"; }
 
     Mod+E repeat=false hotkey-overlay-title="Thunar" { spawn-sh "thunar"; }
 
@@ -37,11 +35,12 @@ binds {
     XF86MonBrightnessUp allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+10%"; }
     XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "10%-"; }
 
-    XF86Mail repeat=false hotkey-overlay-title="Thunderbird" { spawn "flatpak" "run" "org.mozilla.thunderbird_esr"; }
-    XF86Calculator repeat=false hotkey-overlay-title="Calculator" { spawn "flatpak" "run" "org.gnome.Calculator"; }
     XF86Search repeat=false hotkey-overlay-title="Search" { spawn "catfish"; }
-    XF86HomePage repeat=false hotkey-overlay-title="Browser" { spawn "flatpak" "run" "io.gitlab.librewolf-community"; }
-    XF86Tools repeat=false hotkey-overlay-title="Amazon Music" { spawn "flatpak" "run" "io.gitlab.librewolf-community" "https://music.amazon.it"; }
+    XF86Mail repeat=false hotkey-overlay-title="To do" { spawn "notify-send" "XF86Mail to do"; }
+    XF86Calculator repeat=false hotkey-overlay-title="To do" { spawn "notify-send" "XF86Calculator to do"; }
+    XF86HomePage repeat=false hotkey-overlay-title="To do" { spawn "notify-send" "XF86HomePage to do"; }
+    XF86Tools repeat=false hotkey-overlay-title="To do" { spawn "notify-send" "XF86Tools to do"; }
+    
     // The physical power button appears to arrive here as XF86Sleep
     // (KEY_SLEEP) rather than XF86PowerOff, which is why it suspended
     // via zzz. Kept unconfirmed by capture: if the Fn sleep key also
