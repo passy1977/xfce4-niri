@@ -128,40 +128,6 @@ manage autostart entries the same way you would on stock Xfce.
 Launch it with `Mod+A` (see [niri's
 keybindings](xfce4-niri-config/niri/README.md#keybindings)).
 
-## Dependencies
-
-### Build
-pkg-config
-rustc / cargo (>= 1.85)
-gtk3
-glib2
-dbus-1 >= 1.6
-
-### Runtime
-xdg-user-dirs
-xdg-desktop-portal
-niri
-dbus
-xfce4-power-manager
-upower
-swayidle
-swaylock
-systemd (or elogind, for loginctl)
-xfce4-session (optional, for autostart desktop entries)
-
-### For an DE minimal
-libxfce4panel-4.20
-libxfce4ui-4.20
-libxfce4util-4.20
-libxfce4windowing-4.20
-xfce4-appfinder-4.20
-xfce4-notifyd-0.9
-xfce4-panel-4.20
-xfce4-power-manager-4.20
-xfce4-pulseaudio-plugin
-xfce4-settings-4.20
-xfce4-whiskermenu-plugin
-
 ## Reference
 The niri configuration is inspired by [
 JakeAtLinux
