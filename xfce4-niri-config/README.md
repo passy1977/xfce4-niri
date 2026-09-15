@@ -139,15 +139,6 @@ power-off-monitors) are left disabled on purpose and are not listed here.
 
 ## Theming
 
-GTK/window-manager theming comes from **Minimal-Light**
-(`~/.local/share/themes/Minimal-Light`, source:
-[passy1977/XFCE4-theme-Minimal-Light](https://github.com/passy1977/XFCE4-theme-Minimal-Light)),
-applied via `xfsettingsd`:
-
-- `GtkTheme` / `MetacityTheme` / `xfwm4` theme: **Minimal-Light**
-- Icon theme: **Zafiro-icons-Light**
-- Cursor theme: **DeepinDark-cursors**
-
 `swaylock/config` deliberately re-derives its palette from the theme's own
 sources (`gtk-2.0/gtkrc`, `xfwm4/themerc`) instead of using swaylock's
 defaults, so the lock screen reads as part of the same desktop:
@@ -163,7 +154,7 @@ failed unlock attempt use the same accent.
 
 ## xdg-desktop-portal
 
-`config.kdl` sets `XDG_CURRENT_DESKTOP=niri`, which is what makes the portal
+`config.kdl` sets `XDG_CURRENT_DESKTOP=niri:XFCE`, which is what makes the portal
 frontend pick up `~/.config/xdg-desktop-portal/niri-portals.conf`:
 
 ```ini
@@ -187,6 +178,8 @@ org.freedesktop.impl.portal.Secret=gnome-keyring;
   (`niri.d/50-startup.kdl`), since runit won't launch it via autostart the
   way a systemd user session would.
 
+## Backlight permissions (udev)
+
 Whenever a backlight device is added, this rule hands group **video** write
 access to its `brightness` and `bl_power` sysfs files. Without it, both the
 brightness keys (`XF86MonBrightnessUp`/`Down` → `brightnessctl` in
@@ -197,9 +190,12 @@ there is no `systemd-backlight@.service` to restore/save it, so this daemon
 does that job itself, polling the sysfs file and storing the last value under
 `~/.local/state/niri-brightness`.
 
-## Disable unused icon from xfce-settings
-[.local/share/applications/xfce4-accessibility-settings.desktop](../../.local/share/applications/xfce4-accessibility-settings.desktop)  
-[.local/share/applications/xfce-keyboard-settings.desktop](../../.local/share/applications/xfce-keyboard-settings.desktop)  
-[.local/share/applications/xfce-mouse-settings.desktop](../../.local/share/applications/xfce-mouse-settings.desktop)
+## Hide unused xfce4-settings icons
 
+These settings dialogs don't work on Wayland, so their icons are hidden from
+the Settings panel by setting `NoDisplay=true` in the following `.desktop`
+files (installed into `~/.local/share/applications` by `install.sh`):
 
+- [applications/xfce4-accessibility-settings.desktop](applications/xfce4-accessibility-settings.desktop)
+- [applications/xfce-keyboard-settings.desktop](applications/xfce-keyboard-settings.desktop)
+- [applications/xfce-mouse-settings.desktop](applications/xfce-mouse-settings.desktop)

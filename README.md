@@ -128,7 +128,7 @@ manage autostart entries the same way you would on stock Xfce.
 ## niri's keybindings
 
 For the preconfigured keys, see [niri's
-keybindings](xfce4-niri-config/niri/README.md#keybindings).
+keybindings](xfce4-niri-config/README.md#keybindings).
 
 ## Reference
 
