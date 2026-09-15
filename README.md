@@ -1,4 +1,13 @@
 # xfce4-niri
+
+[![CI](https://github.com/passy1977/xfce4-niri/actions/workflows/ci.yml/badge.svg)](https://github.com/passy1977/xfce4-niri/actions/workflows/ci.yml)
+[![License: GPL-2.0](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
+[![MSRV 1.85](https://img.shields.io/badge/rustc-1.85%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
+[![Rust 2024 edition](https://img.shields.io/badge/edition-2024-orange.svg?logo=rust)](https://doc.rust-lang.org/edition-guide/rust-2024/)
+[![niri](https://img.shields.io/badge/WM-niri-8A2BE2.svg)](https://github.com/YaLTeR/niri)
+[![Xfce4](https://img.shields.io/badge/DE-Xfce4-2284F2.svg?logo=xfce)](https://xfce.org)
+[![GitHub release](https://img.shields.io/github/v/release/passy1977/xfce4-niri?include_prereleases)](https://github.com/passy1977/xfce4-niri/releases)
+
 A utility to better integrate Xfce4 applications with the niri window manager, creating a minimal, lightweight, and stable desktop environment.
 
 ## Install
