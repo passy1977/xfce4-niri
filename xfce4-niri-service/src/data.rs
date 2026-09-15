@@ -130,7 +130,7 @@ impl Data {
 
     }
 
-    pub(crate) fn check_persistence(&mut self) -> Result<(), String> {
+    pub(crate) fn check_persistence(&mut self) -> Result<()> {
         let elements = [
             (String::from_str(XDG_AUTOSTART).unwrap_or_default(), true, format!("XDG autostart folder not found: {XDG_AUTOSTART}")),
             (self.xdg_home_autostart.clone(), false, format!("XDG home autostart folder not found: {}", self.xdg_home_autostart)),
@@ -145,7 +145,7 @@ impl Data {
 
             if !file_or_folder.exists()  {
                 if mandatory {
-                    return Err(error);
+                    return Err(Error::UnhandledOwned(error));
                 } else {
                     log.syslog(Self::APP_TAG, Priority::LogInfo, &error);
                 }
@@ -161,14 +161,14 @@ impl Data {
         } else if Path::new(LOCK_SCREEN_GLOBAL_FILE).exists() {
             lock_screen_file = LOCK_SCREEN_GLOBAL_FILE.to_owned();
         } else {
-            return Err(Error::UnhandledOwned(format!("Local lock screen file not found: {}", LOCK_SCREEN_LOCAL_FILE)).to_string());
+            return Err(Error::UnhandledOwned(format!("Local lock screen file not found: {}", LOCK_SCREEN_LOCAL_FILE)));
         }
         
 
         if !fs::metadata(&lock_screen_file)
             .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
             .unwrap_or(false) {
-                return Err(Error::UnhandledOwned(format!("Lock screen file is not executable: {}", self.lock_screen_file)).to_string())
+                return Err(Error::UnhandledOwned(format!("Lock screen file is not executable: {}", self.lock_screen_file)))
             }
 
         self.lock_screen_file = lock_screen_file;

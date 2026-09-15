@@ -20,15 +20,16 @@
 
 extern crate xfce4_niri_lib;
 
-use std::error::Error;
-use osal_rs::utils::Result;
+use std::process::ExitCode;
+
+use osal_rs::utils::{Error, Result};
 use xfce4_niri_lib::lock::Lock;
 use xfce4_niri_lib::socket::Socket;
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 const APP_TAG: &str = "CLI";
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn run() -> Result<()> {
     let log = SysLog::open(Options::LogPid as i32 | Options::LogNDelay as i32); 
 
     let lock_file = match xfce4_niri_lib::get_safe_path(None) {
@@ -36,7 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Err(e) => {
             let msg = e.to_string();
             log.syslog(APP_TAG, Priority::LogCrit, &msg);
-            return Err(msg.into());
+            return Err(Error::UnhandledOwned(msg));
         }
     };
 
@@ -52,13 +53,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             format!("fxce4-niri-service not running")
         };
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
-        return Err(msg.into());
+        return Err(Error::UnhandledOwned(msg));
     }
 
     let Ok(unix_socket) = xfce4_niri_lib::get_safe_path(Some("xfce4-niri-service.sock")) else {
         let msg = "Failed to get safe path for unix socket";
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
-        return Err(msg.into());
+        return Err(Error::Unhandled(msg));
     };
 
     let commands: Vec<String> = std::env::args().skip(1).collect();
@@ -66,8 +67,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Err(e) = Socket::new(unix_socket).run_client(&commands) {
         let msg = e.to_string();
         log.syslog(APP_TAG, Priority::LogCrit, &msg);
-        return Err(msg.into())
+        return Err(Error::UnhandledOwned(msg))
     }
 
     Ok(())
+}
+
+fn main() -> ExitCode {
+    match run() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            // Print only the description of the error, no `Debug` noise.
+            let msg = match e {
+                Error::Unhandled(msg) => msg.to_string(),
+                Error::UnhandledOwned(msg) => msg,
+                e => e.to_string(),
+            };
+            eprintln!("{APP_TAG}: {msg}");
+            ExitCode::FAILURE
+        }
+    }
 }

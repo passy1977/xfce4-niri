@@ -27,13 +27,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use osal_rs::os::{Mutex, MutexFn, System, Thread, ThreadFn};
-use osal_rs::utils::{Error, Result as OsalResult};
+use osal_rs::utils::{Error, Result};
 use xfce4_niri_lib::exec;
 
 use crate::data::{Data, XDG_AUTOSTART};
 use crate::desktop_entry::{DESKTOP_SUFFIX, DesktopEntry, current_desktops};
 use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
-use xfce4_niri_lib::Result;
 
 macro_rules! merge_autostart {
     ($locale:expr, $merge:expr, $autostart:expr) => {{
@@ -89,7 +88,7 @@ impl Autostart {
         }
     }
 
-    fn read_autostart(dir: &str) -> OsalResult<HashMap<String, String>> {
+    fn read_autostart(dir: &str) -> Result<HashMap<String, String>> {
 
         if !Path::new(dir).is_dir() {
             return Ok(HashMap::new())
