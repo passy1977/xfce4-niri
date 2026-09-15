@@ -24,6 +24,7 @@ sudo apt install \
     xfce4-pulseaudio-plugin \
     xfce4-settings \
     xfce4-whiskermenu-plugin \
+    thunar \
     alacrity
 ```
 
@@ -55,6 +56,7 @@ sudo xbps-install -S \
     xfce4-pulseaudio-plugin \
     xfce4-settings \
     xfce4-whiskermenu-plugin \
+    thunar \
     alacrity \
     niri 
 ```
@@ -96,6 +98,13 @@ It:
 - **Unix socket** — exposes a small control socket (used e.g. by `xfce4-niri`
   to request `lock_screen`) for other components to talk to the running
   service.
+
+The idle timeout before the screen is locked is read from Xfce4 Power
+Manager, so you can tune it from the usual settings dialog: open
+**Xfce4 Power Manager → Display**, then set **Switch off after** under
+*On Battery* and/or *Plugged in*.
+
+![Xfce4 Power Manager](media/xfce4-power-manager-settings.png)
 
 ## xfce4-niri-autostart
 
