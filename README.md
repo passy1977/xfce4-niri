@@ -77,6 +77,26 @@ This:
 Options: `./install.sh --help` (`--debug` for a debug build, `--bin-dir DIR` to
 override the binaries directory, `-y`/`--yes` to skip the overwrite prompt).
 
+## xfce4-niri-service
+
+`xfce4-niri-service` is the background daemon that replaces the pieces of
+`xfce4-session`/`xfce4-power-manager` niri doesn't provide on its own,
+keeping a single instance running (via a lock file) for the whole session.
+It:
+
+- **Brightness** — watches the backlight device and persists/restores the
+  screen brightness across sessions.
+- **Lock screen** — integrates with `swaylock`/`swayidle` and honors
+  XFCE's presentation-mode setting (via D-Bus/xfconf), so idle-locking is
+  suspended during presentations just like on stock Xfce.
+- **Power management** — talks to `xfce4-power-manager` and `UPower` over
+  D-Bus to react to power-source and presentation-mode changes.
+- **Autostart** — launches the `~/.config/autostart/*.desktop` entries
+  that niri doesn't process itself.
+- **Unix socket** — exposes a small control socket (used e.g. by `xfce4-niri`
+  to request `lock_screen`) for other components to talk to the running
+  service.
+
 ## xfce4-niri-autostart
 
 `niri` does not process `~/.config/autostart/*.desktop` the way a full
