@@ -34,7 +34,7 @@ current state.
 | Role | Package(s) (xbps) | Notes |
 |---|---|---|
 | Compositor | `niri` | |
-| Terminal | `alacritty` | `Mod+T` |
+| Terminal | `ghostty` | `Mod+T` |
 | App launcher | `xfce4-appfinder` | `Mod+Space`, opened floating (`40-rules.kdl`) |
 | File manager | `Thunar`, `thunar-archive-plugin`, `thunar-volman` | started as `--daemon` at startup |
 | Panel / tray | `xfce4-panel` | layer-shell aware, hosts nm-applet/blueman-applet |
@@ -63,7 +63,7 @@ power-off-monitors) are left disabled on purpose and are not listed here.
 | Bind | Action |
 |---|---|
 | `Mod+Shift+O` | Show hotkey overlay |
-| `Mod+T` | Terminal — `alacritty` |
+| `Mod+T` | Terminal — `ghostty` |
 | `Mod+Space` | App launcher — `xfce4-appfinder` |
 | `Mod+E` | File manager — `Thunar` |
 | `Mod+Shift+Escape` | Lock screen — `swaylock` (skipped if presentation mode is on) |

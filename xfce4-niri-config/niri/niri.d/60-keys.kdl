@@ -8,8 +8,8 @@
 binds {
     Mod+Shift+O { show-hotkey-overlay; }
 
-    Mod+T hotkey-overlay-title="Open a Terminal: alacritty" { spawn "alacritty"; }
-    Mod+Return hotkey-overlay-title="Open a Terminal: alacritty" { spawn "alacritty"; }
+    Mod+T hotkey-overlay-title="Open a Terminal: ghostty" { spawn "ghostty"; }
+    Mod+Return hotkey-overlay-title="Open a Terminal: ghostty" { spawn "ghostty"; }
     Mod+Space hotkey-overlay-title="Run an Application: xfce4-appfinder" { spawn "xfce4-appfinder"; }
 
     // Lock the screen (styled config in ../swaylock/config, which sets `daemonize`). The same config is also used by the swayidle
