@@ -84,6 +84,7 @@ everything for the current user (no root needed) with:
 This script:
 - builds `xfce4-niri`, `xfce4-niri-service`, `xfce4-niri-autostart` (`cargo build --workspace --release`)
 - installs the binaries into `~/.local/bin` (or `~/bin`, whichever is already on `$PATH`)
+- installs the helper scripts in [scripts](scripts) (e.g. [`xfce4-niri-set-cursor`](#xfce4-niri-set-cursor)) into the same directory
 - installs [xfce4-niri-config/niri](xfce4-niri-config/niri) into `~/.config/niri`, backing up an existing one first
 - installs [xfce4-niri-config/applications](xfce4-niri-config/applications) `.desktop` files into `~/.local/share/applications`
 
@@ -135,6 +136,39 @@ manage autostart entries the same way you would on stock Xfce.
 - **Close** — dismisses the window. Changes are written to the underlying
   `.desktop` file as soon as they are made, so nothing needs to be saved
   explicitly.
+
+## xfce4-niri-set-cursor
+
+Under niri + Xfce4 the cursor theme is read from several places (niri itself,
+GSettings, xfconf/xsettings, GTK `settings.ini`, the XCursor fallback), so
+changing it from *Xfce4 Settings → Mouse and Touchpad* alone leaves some
+applications with the old cursor. `xfce4-niri-set-cursor` applies an XCursor
+theme to all of them in one go:
+
+```sh
+xfce4-niri-set-cursor                  # list the installed cursor themes
+xfce4-niri-set-cursor Adwaita          # apply a theme at the default size (24)
+xfce4-niri-set-cursor Bibata-Modern 32 # apply a theme at a custom size (8-256)
+```
+
+It updates, in order:
+
+1. **niri** — writes `~/.config/niri/niri.d/35-cursor.kdl` (included from
+   `niri.d/_index.kdl`) and validates the result with `niri validate`,
+   reverting the change if niri rejects it.
+2. **GSettings** — `org.gnome.desktop.interface` `cursor-theme`/`cursor-size`
+   (GTK3/GTK4 apps on Wayland).
+3. **xfconf** — `xsettings` `/Gtk/CursorThemeName` and `/Gtk/CursorThemeSize`
+   (XWayland clients and Xfce4 components).
+4. **GTK** — `gtk-cursor-theme-name`/`gtk-cursor-theme-size` in
+   `~/.config/gtk-3.0/settings.ini` (and `gtk-4.0` if present).
+5. **XCursor** — `~/.icons/default/index.theme`, for clients that read none of
+   the above.
+
+Finally it restarts `xfce4-panel`, if running. Applications that are already
+open pick up the new cursor after a restart. `35-cursor.kdl` is generated:
+don't edit it by hand, rerun the script instead, and remove any other
+`cursor {}` block from the niri config (the script warns if it finds one).
 
 ## niri's keybindings
 

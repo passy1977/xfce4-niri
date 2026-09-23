@@ -4,6 +4,7 @@
 #
 #   - compiles the workspace binaries and installs them into a bin
 #     directory already on $PATH (~/.local/bin preferred, ~/bin as fallback)
+#   - installs scripts/*                         -> the same bin directory
 #   - installs xfce4-niri-config/niri            -> ~/.config/niri
 #   - installs xfce4-niri-config/applications/*  -> ~/.local/share/applications
 #
@@ -99,6 +100,12 @@ for bin in xfce4-niri xfce4-niri-service xfce4-niri-autostart; do
     install -m 755 "$TARGET_DIR/$bin" "$BIN_DIR/$bin"
 done
 
+echo "==> Installing helper scripts to $BIN_DIR"
+for script in scripts/*; do
+    [ -f "$script" ] || continue
+    install -m 755 "$script" "$BIN_DIR/$(basename "$script")"
+done
+
 if ! path_has "$BIN_DIR"; then
     echo "warning: $BIN_DIR is not in your PATH." >&2
     echo "         add e.g. 'export PATH=\"$BIN_DIR:\$PATH\"' to your shell profile," >&2
@@ -154,6 +161,7 @@ cat <<EOF
 
 Done.
   binaries:      $BIN_DIR/{xfce4-niri,xfce4-niri-service,xfce4-niri-autostart}
+  scripts:       $BIN_DIR/{$(cd scripts && ls | paste -sd, -)}
   niri config:   $CONFIG_DIR
   app launchers: $APPS_DIR
 

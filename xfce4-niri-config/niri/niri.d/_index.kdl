@@ -5,6 +5,7 @@
 include "10-inputs.kdl"
 include "20-outputs.kdl"
 include "30-appearance.kdl"
+include "35-cursor.kdl"
 include "40-rules.kdl"
 include "50-startup.kdl"
 include "60-keys.kdl"
