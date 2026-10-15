@@ -1,4 +1,5 @@
 use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use xfce4_niri_lib::lock::Lock;
 use xfce4_niri_lib::socket::Socket;
@@ -9,6 +10,26 @@ fn seen() -> &'static Mutex<Vec<Vec<String>>> {
     SEEN.get_or_init(|| Mutex::new(Vec::new()))
 }
 
+fn record_request(request: &[String]) -> osal_rs::utils::Result<()> {
+    seen().lock().unwrap().push(request.to_vec());
+    Ok(())
+}
+
+fn ignore_request(_: &[String]) -> osal_rs::utils::Result<()> {
+    Ok(())
+}
+
+/// `start_server` hands off to its accept-loop thread and returns before it
+/// has necessarily bound the socket node, so give it a moment rather than
+/// racing it.
+fn wait_for(path: &std::path::Path, timeout: Duration) {
+    let deadline = Instant::now() + timeout;
+    while !path.exists() {
+        assert!(Instant::now() < deadline, "{} never appeared", path.display());
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
 #[test]
 fn the_server_answers_a_client() {
 
@@ -16,24 +37,24 @@ fn the_server_answers_a_client() {
     let mut env = EnvGuard::new();
     env.set("XDG_RUNTIME_DIR", dir.path());
 
-    let lock = Lock::acquire(None).expect("cannot take the lock");
+    let mut locked_by = None;
+    let _lock = Lock::acquire(None, &mut locked_by).expect("cannot take the lock");
 
     let path = xfce4_niri_lib::get_safe_path(Some("smoke.sock")).unwrap();
 
     let mut socket = Socket::new(path.clone());
     socket
-        .start_server(&lock, osal_rs::os::Mutex::new_arc(|request: &[String]| {
-            seen().lock().unwrap().push(request.to_vec());
-        }))
+        .start_server(&record_request)
         .expect("start_server failed");
 
-    assert!(path.exists(), "the socket node must still be there after start_server");
+    wait_for(&path, Duration::from_secs(1));
 
     // A second server on the same path has to be refused, not silently allowed.
-    assert!(Socket::new(path.clone()).start_server(&lock, osal_rs::os::Mutex::new_arc(|_: &[String]| {})).is_err());
+    assert!(Socket::new(path.clone()).start_server(&ignore_request).is_err());
 
+    Socket::new(path.clone()).run_client(&["PING".to_string()]).expect("run_client failed");
     Socket::new(path.clone())
-        .run_client(&lock, &["PING".to_string(), "SET a b".to_string()])
+        .run_client(&["SET".to_string(), "a".to_string(), "b".to_string()])
         .expect("run_client failed");
 
     let seen = seen().lock().unwrap().clone();

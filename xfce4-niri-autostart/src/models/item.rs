@@ -473,7 +473,7 @@ mod tests {
         }
 
         if !only_show_in.is_empty() {
-            rc.write_list_entry(c"OnlyShowIn", only_show_in);
+            rc.write_entry(c"OnlyShowIn", &only_show_in.join(";"));
         }
 
         if let Some(run_hook) = run_hook {

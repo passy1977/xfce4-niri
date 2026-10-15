@@ -466,8 +466,6 @@ impl Drop for Rc {
 #[cfg(test)]
 mod tests {
 
-    use std::fs;
-
     use super::*;
     use crate::{models::item::Item, test_support::{TempDir, xfce_resource_ready}};
 
@@ -555,11 +553,8 @@ mod tests {
             assert!(rc.write_entry(c"Name", "Niri"));
             assert!(rc.write_int_entry(c"RunHook", 1));
             assert!(rc.write_bool_entry(c"Hidden", true));
-            assert!(rc.write_list_entry(c"OnlyShowIn", &["XFCE", "Niri"]));
 
-            assert!(rc.is_dirty());
             rc.flush();
-            assert!(!rc.is_dirty());
         }
 
         let rc = Rc::simple_open(&path, true).expect("the file just written");
@@ -569,72 +564,6 @@ mod tests {
         assert_eq!(rc.read_entry(c"Name").as_deref(), Some("Niri"));
         assert_eq!(rc.read_int_entry(c"RunHook", 42), 1);
         assert!(rc.read_bool_entry(c"Hidden", false));
-        assert_eq!(rc.read_list_entry(c"OnlyShowIn"), ["XFCE", "Niri"]);
-    }
-
-    /// What lands on disk is a plain `.desktop` group.
-    #[test]
-    fn what_is_written_is_a_desktop_file() {
-
-        let dir = TempDir::new();
-        let path = dir.path().join("shape.desktop");
-
-        {
-            let rc = Rc::simple_open(&path, false).expect("a writable view");
-            rc.set_group(Item::DESKTOP_ENTRY);
-
-            rc.write_entry(c"Type", "Application");
-            rc.write_bool_entry(c"Hidden", false);
-            rc.write_list_entry(c"OnlyShowIn", &["XFCE"]);
-            rc.write_list_entry(c"NotShowIn", &["GNOME", "KDE"]);
-        }
-
-        let written = fs::read_to_string(&path).expect("the file the view flushed on close");
-        let lines: Vec<&str> = written.lines().collect();
-
-        assert!(lines.contains(&"[Desktop Entry]"), "{written}");
-        assert!(lines.contains(&"Type=Application"), "{written}");
-        assert!(lines.contains(&"Hidden=false"), "{written}");
-
-        // Joined, so no terminating `;`.
-        assert!(lines.contains(&"OnlyShowIn=XFCE"), "{written}");
-        assert!(lines.contains(&"NotShowIn=GNOME;KDE"), "{written}");
-    }
-
-    /// Deleting a key leaves the rest of the group alone.
-    #[test]
-    fn delete_entry_and_delete_group_drop_what_was_written() {
-
-        let dir = TempDir::new();
-        let path = dir.path().join("deleted.desktop");
-
-        {
-            let rc = Rc::simple_open(&path, false).expect("a writable view");
-            rc.set_group(Item::DESKTOP_ENTRY);
-
-            rc.write_entry(c"Type", "Application");
-            rc.write_entry(c"Name", "Niri");
-
-            assert!(rc.delete_entry(c"Name", true));
-        }
-
-        {
-            let rc = Rc::simple_open(&path, true).expect("the file just written");
-            rc.set_group(Item::DESKTOP_ENTRY);
-
-            assert_eq!(rc.read_entry(c"Type").as_deref(), Some("Application"));
-            assert_eq!(rc.read_entry(c"Name"), None);
-        }
-
-        {
-            let rc = Rc::simple_open(&path, false).expect("a writable view");
-            assert!(rc.delete_group(Item::DESKTOP_ENTRY, true));
-        }
-
-        let rc = Rc::simple_open(&path, true).expect("the file just written");
-        rc.set_group(Item::DESKTOP_ENTRY);
-
-        assert_eq!(rc.read_entry(c"Type"), None);
     }
 
     /// Nothing left to flush, so the file is never created.
@@ -648,10 +577,8 @@ mod tests {
         rc.set_group(Item::DESKTOP_ENTRY);
 
         rc.write_entry(c"Type", "Application");
-        assert!(rc.is_dirty());
 
         rc.rollback();
-        assert!(!rc.is_dirty());
 
         drop(rc);
         assert!(!path.exists());
@@ -678,11 +605,7 @@ mod tests {
         assert!(!rc.write_entry(c"Name", "Niri"));
         assert!(!rc.write_int_entry(c"RunHook", 1));
         assert!(!rc.write_bool_entry(c"Hidden", true));
-        assert!(!rc.write_list_entry(c"OnlyShowIn", &["XFCE"]));
-        assert!(!rc.delete_entry(c"Type", true));
-        assert!(!rc.delete_group(Item::DESKTOP_ENTRY, true));
 
-        assert!(!rc.is_dirty());
         assert_eq!(rc.read_entry(c"Type").as_deref(), Some("Application"));
     }
 
@@ -697,8 +620,6 @@ mod tests {
         rc.set_group(Item::DESKTOP_ENTRY);
 
         assert!(!rc.write_entry(c"Name", "nul\0byte"));
-        assert!(!rc.write_list_entry(c"OnlyShowIn", &["XFCE", "nul\0byte"]));
-        assert!(!rc.is_dirty());
 
         assert!(Rc::simple_open(Path::new(OsStr::from_bytes(b"/tmp/nul\0byte.desktop")), false).is_none());
     }

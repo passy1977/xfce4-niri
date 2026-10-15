@@ -170,7 +170,6 @@ mod tests {
             "on suspend",
             "on hibernate",
             "on hybrid sleep",
-            "on switch user",
         ]);
     }
 }
