@@ -37,7 +37,7 @@ sudo apt install \
     xfce4-whiskermenu-plugin \
     thunar \
     xfce4-terminal \
-    mate-polkit 
+    mate-polkit
 ```
 
 `niri` is not packaged in Debian/Ubuntu's default repositories yet; install it from your distro's community repo or build it from [source](https://github.com/YaLTeR/niri). Rust (`rustc`/`cargo` >= 1.85) should be installed via [rustup](https://rustup.rs) rather than `apt`, since distro packages usually lag behind the required version.

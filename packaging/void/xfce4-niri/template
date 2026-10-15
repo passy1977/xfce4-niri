@@ -1,7 +1,7 @@
 # Template file for 'xfce4-niri'
 pkgname=xfce4-niri
 version=0.2.1
-revision=1
+revision=3
 build_style=cargo
 make_build_args="--workspace"
 make_check_args="--workspace"
@@ -9,7 +9,7 @@ hostmakedepends="pkg-config"
 makedepends="gtk+3-devel glib-devel dbus-devel libxfce4ui-devel libxfce4util-devel"
 depends="niri dbus elogind xfconf xfce4-settings xfce4-panel xfce4-power-manager
  xfce4-appfinder xfce4-terminal Thunar swaybg swayidle swaylock upower
- xdg-desktop-portal-gtk polkit-gnome"
+ xdg-desktop-portal-gtk xdg-desktop-portal-gnome"
 short_desc="Integrate Xfce4 applications with the niri Wayland compositor"
 maintainer="Antonio Salsi <passy.linux@zresa.it>"
 license="LGPL-2.1-or-later"

@@ -8,6 +8,9 @@
 #   - installs xfce4-niri-config/niri            -> ~/.config/niri
 #   - installs xfce4-niri-config/applications/*  -> ~/.local/share/applications
 #
+# With --uninstall, removes everything listed above instead (the niri config
+# is moved to a timestamped backup rather than deleted).
+#
 # Run with --help for options.
 
 set -euo pipefail
@@ -19,6 +22,7 @@ PROFILE=release
 ASSUME_YES=0
 BIN_DIR_OVERRIDE=""
 SKIP_TESTS=0
+UNINSTALL=0
 
 usage() {
     cat <<EOF
@@ -28,7 +32,10 @@ Options:
   --debug         build in debug mode instead of release
   --bin-dir DIR   install binaries into DIR instead of auto-detecting
   --skip-tests    skip running the test suite before building
-  -y, --yes       overwrite an existing ~/.config/niri without asking
+  --uninstall     remove a previous installation (binaries, scripts,
+                  application launchers; ~/.config/niri is backed up)
+  -y, --yes       overwrite (or, with --uninstall, back up and remove)
+                  an existing ~/.config/niri without asking
   -h, --help      show this help
 EOF
 }
@@ -38,21 +45,13 @@ while [ $# -gt 0 ]; do
         --debug) PROFILE=debug ;;
         --bin-dir) BIN_DIR_OVERRIDE="${2:?--bin-dir requires an argument}"; shift ;;
         --skip-tests) SKIP_TESTS=1 ;;
+        --uninstall) UNINSTALL=1 ;;
         -y|--yes) ASSUME_YES=1 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
     esac
     shift
 done
-
-command -v cargo >/dev/null 2>&1 || {
-    echo "error: cargo not found. Install Rust (>= 1.85) via https://rustup.rs" >&2
-    exit 1
-}
-command -v pkg-config >/dev/null 2>&1 || {
-    echo "warning: pkg-config not found, the build will likely fail." >&2
-    echo "         see README.md 'Install' section for the required system packages." >&2
-}
 
 path_has() {
     case ":${PATH}:" in
@@ -77,6 +76,72 @@ fi
 
 CONFIG_DIR="$HOME/.config/niri"
 APPS_DIR="$HOME/.local/share/applications"
+BINARIES=(xfce4-niri xfce4-niri-service xfce4-niri-autostart)
+
+backup_if_exists() {
+    local target="$1"
+    if [ -e "$target" ]; then
+        local backup
+        backup="${target}.bak-$(date +%Y%m%d%H%M%S)"
+        echo "==> Backing up existing $target -> $backup"
+        mv "$target" "$backup"
+    fi
+}
+
+remove_file() {
+    if [ -e "$1" ] || [ -L "$1" ]; then
+        echo "    removing $1"
+        rm -f "$1"
+    fi
+}
+
+if [ "$UNINSTALL" -eq 1 ]; then
+    echo "==> Removing binaries from $BIN_DIR"
+    for bin in "${BINARIES[@]}"; do
+        remove_file "$BIN_DIR/$bin"
+    done
+
+    echo "==> Removing helper scripts from $BIN_DIR"
+    for script in scripts/*; do
+        [ -f "$script" ] || continue
+        remove_file "$BIN_DIR/$(basename "$script")"
+    done
+
+    echo "==> Removing application launchers from $APPS_DIR"
+    for f in xfce4-niri-config/applications/*.desktop; do
+        remove_file "$APPS_DIR/$(basename "$f")"
+    done
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
+    fi
+
+    if [ -e "$CONFIG_DIR" ]; then
+        remove_niri_config=1
+        if [ "$ASSUME_YES" -ne 1 ]; then
+            read -r -p "Back up and remove $CONFIG_DIR? [y/N] " reply
+            case "$reply" in
+                [yY]*) ;;
+                *) echo "Keeping niri config."; remove_niri_config=0 ;;
+            esac
+        fi
+        if [ "$remove_niri_config" -eq 1 ]; then
+            backup_if_exists "$CONFIG_DIR"
+        fi
+    fi
+
+    echo
+    echo "Done. xfce4-niri has been uninstalled."
+    exit 0
+fi
+
+command -v cargo >/dev/null 2>&1 || {
+    echo "error: cargo not found. Install Rust (>= 1.85) via https://rustup.rs" >&2
+    exit 1
+}
+command -v pkg-config >/dev/null 2>&1 || {
+    echo "warning: pkg-config not found, the build will likely fail." >&2
+    echo "         see README.md 'Install' section for the required system packages." >&2
+}
 
 if [ "$SKIP_TESTS" -ne 1 ]; then
     echo "==> Running test suite"
@@ -96,7 +161,7 @@ fi
 
 echo "==> Installing binaries to $BIN_DIR"
 mkdir -p "$BIN_DIR"
-for bin in xfce4-niri xfce4-niri-service xfce4-niri-autostart; do
+for bin in "${BINARIES[@]}"; do
     install -m 755 "$TARGET_DIR/$bin" "$BIN_DIR/$bin"
 done
 
@@ -111,16 +176,6 @@ if ! path_has "$BIN_DIR"; then
     echo "         add e.g. 'export PATH=\"$BIN_DIR:\$PATH\"' to your shell profile," >&2
     echo "         otherwise niri won't find xfce4-niri-service at startup." >&2
 fi
-
-backup_if_exists() {
-    local target="$1"
-    if [ -e "$target" ]; then
-        local backup
-        backup="${target}.bak-$(date +%Y%m%d%H%M%S)"
-        echo "==> Backing up existing $target -> $backup"
-        mv "$target" "$backup"
-    fi
-}
 
 install_niri_config=1
 if [ -e "$CONFIG_DIR" ] && [ "$ASSUME_YES" -ne 1 ]; then

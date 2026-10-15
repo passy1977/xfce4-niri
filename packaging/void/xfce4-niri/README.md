@@ -45,6 +45,15 @@ sudo xbps-install -R hostdir/binpkgs xfce4-niri
 
 Then choose **Niri (Xfce)** in the display manager, or run `startniri` from a TTY.
 
+The package does not pull in a PolicyKit authentication agent, so install the one you prefer
+(`polkit-gnome` or `mate-polkit`). `xfce4-niri-service` starts `polkit-gnome` from its
+`/etc/xdg/autostart` entry. The `mate-polkit` entry is limited to `OnlyShowIn=MATE`, so it is skipped in
+this session; start it from `~/.config/niri` instead:
+
+```kdl
+spawn-at-startup "/usr/libexec/polkit-mate-authentication-agent-1"
+```
+
 ## Installed layout
 
 | Path | Content |

@@ -43,7 +43,7 @@ current state.
 | Networking | `network-manager-applet` (`nm-applet`) | |
 | Bluetooth | `blueman` (`blueman-applet`) | tray icon in xfce4-panel |
 | Session/seat management | `elogind`, `seatd` | provides the logind-compatible API niri/polkit/xfce4-power-manager expect under runit |
-| PolicyKit agent | `polkit-gnome`, `polkit` | started with a retry loop — races elogind/polkitd at boot |
+| PolicyKit agent | `polkit-gnome` or `mate-polkit`, `polkit` | started with a retry loop — races elogind/polkitd at boot |
 | Audio | `pulseaudio`, `pulseaudio-utils`, `pavucontrol`, `xfce4-pulseaudio-plugin` | volume keys use `pactl` (no WirePlumber/`wpctl` here) |
 | Media keys | `playerctl` | MPRIS play/stop/prev/next |
 | Backlight | `brightnessctl` | brightness keys; see [udev rule](#backlight-permissions-udev) |
