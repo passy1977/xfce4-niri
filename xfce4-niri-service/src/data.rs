@@ -36,8 +36,8 @@ use xfce4_niri_lib::syslog::{Options, Priority, SysLog};
 
 static mut DATA: Option<Data> = None;
 pub(crate) const XDG_AUTOSTART: &str = "/etc/xdg/autostart";
-pub(crate) const LOCK_SCREEN_LOCAL_FILE: &str = "/usr/local/libexec/lock_screen";
-pub(crate) const LOCK_SCREEN_GLOBAL_FILE: &str = "/usr/libexec/lock_screen";
+pub(crate) const LOCK_SCREEN_LOCAL_FILE: &str = "/usr/local/libexec/xfce4-niri/lock_screen";
+pub(crate) const LOCK_SCREEN_GLOBAL_FILE: &str = "/usr/libexec/xfce4-niri/lock_screen";
 
 macro_rules! get_env_full_path {
     ($home:expr, $env_var:literal, $real_path:literal) => {{

@@ -1,0 +1,5 @@
+#!/bin/sh
+
+if [ -z "$WAYLAND_DISPLAY" ] && [ -z "$NIRI_SOCKET" ]; then
+    exec dbus-run-session -- niri --session
+fi
