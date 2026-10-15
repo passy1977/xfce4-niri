@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Niri (Xfce)
+Comment=niri scrollable-tiling compositor with the Xfce4 desktop components
+Exec=startniri
+Type=Application
+DesktopNames=niri;XFCE

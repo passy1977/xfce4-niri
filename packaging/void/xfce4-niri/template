@@ -1,0 +1,52 @@
+# Template file for 'xfce4-niri'
+pkgname=xfce4-niri
+version=0.2.1
+revision=1
+build_style=cargo
+make_build_args="--workspace"
+make_check_args="--workspace"
+hostmakedepends="pkg-config"
+makedepends="gtk+3-devel glib-devel dbus-devel libxfce4ui-devel libxfce4util-devel"
+depends="niri dbus elogind xfconf xfce4-settings xfce4-panel xfce4-power-manager
+ xfce4-appfinder xfce4-terminal Thunar swaybg swayidle swaylock upower
+ xdg-desktop-portal-gtk polkit-gnome"
+short_desc="Integrate Xfce4 applications with the niri Wayland compositor"
+maintainer="Antonio Salsi <passy.linux@zresa.it>"
+license="LGPL-2.1-or-later"
+homepage="https://github.com/passy1977/xfce4-niri"
+distfiles="https://github.com/passy1977/xfce4-niri/archive/refs/tags/${version}.tar.gz"
+checksum=c5743d3ac25912669e4972896513c2c8db2c01484abe0d89181831963920181e
+conf_files="/etc/niri/config.kdl /etc/niri/niri.d/*.kdl /etc/niri/swaylock/config"
+
+do_install() {
+	local b f
+
+	for b in xfce4-niri xfce4-niri-service xfce4-niri-autostart; do
+		vbin target/${RUST_TARGET}/release/${b}
+	done
+	vbin scripts/startniri
+	vbin scripts/xfce4-niri-set-cursor
+
+	vinstall xfce4-niri-config/niri/bin/lock_screen 755 usr/libexec/xfce4-niri
+
+	vmkdir etc/niri
+	vcopy xfce4-niri-config/niri/config.kdl etc/niri
+	vcopy xfce4-niri-config/niri/niri.d etc/niri
+	vcopy xfce4-niri-config/niri/swaylock etc/niri
+
+	vinstall xfce4-niri-config/applications/it.salsi.xfce-niri.AutoStart.desktop 644 \
+		usr/share/applications
+	for f in xfce-keyboard-settings xfce-mouse-settings xfce4-accessibility-settings; do
+		vinstall xfce4-niri-config/applications/${f}.desktop 644 \
+			usr/share/xfce4-niri/applications
+	done
+
+	for f in xfce4-niri-config/background/*.jpg; do
+		vinstall ${f} 644 usr/share/backgrounds/xfce4-niri
+	done
+
+	vinstall ${FILESDIR}/xfce4-niri.desktop 644 usr/share/wayland-sessions
+
+	vdoc README.md
+	vdoc xfce4-niri-config/README.md niri-config.md
+}

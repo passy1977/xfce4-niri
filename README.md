@@ -76,6 +76,13 @@ sudo xbps-install -S \
     niri
 ```
 
+## Void Linux package
+
+An xbps-src template that installs everything system-wide (binaries in
+`/usr/bin`, default niri config in `/etc/niri`, a "Niri (Xfce)" display manager
+session) lives in [packaging/void/xfce4-niri](packaging/void/xfce4-niri); see its
+README for how to build it.
+
 ## Build & install
 
 Once the system packages above are installed, build the workspace and install
