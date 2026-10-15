@@ -19,6 +19,8 @@ sudo apt install \
     libgtk-3-dev \
     libglib2.0-dev \
     libdbus-1-dev \
+    libxfce4ui-2-dev \
+    libxfce4util-dev \
     xdg-user-dirs \
     xdg-desktop-portal \
     dbus \
@@ -34,7 +36,7 @@ sudo apt install \
     xfce4-settings \
     xfce4-whiskermenu-plugin \
     thunar \
-    ghostty \
+    xfce4-terminal \
     mate-polkit 
 ```
 
@@ -48,6 +50,8 @@ sudo xbps-install -S \
     gtk+3-devel \
     glib-devel \
     dbus-devel \
+    libxfce4ui-devel \
+    libxfce4util-devel \
     xdg-user-dirs \
     xdg-desktop-portal \
     dbus \
@@ -67,7 +71,7 @@ sudo xbps-install -S \
     xfce4-settings \
     xfce4-whiskermenu-plugin \
     thunar \
-    ghostty \
+    xfce4-terminal \
     polkit-gnome \
     niri
 ```

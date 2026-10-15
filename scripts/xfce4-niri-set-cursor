@@ -91,6 +91,14 @@ if [ -z "$THEME_PATH" ]; then
 fi
 
 # 1. niri
+# niri reads either the user's config or the packaged one in /etc/niri, never
+# both: when the user has none yet, start it as a copy of the packaged one
+if [ ! -f "$NIRI_DIR/config.kdl" ] && [ -f /etc/niri/niri.d/_index.kdl ]; then
+    mkdir -p "$NIRI_DIR"
+    cp -rn /etc/niri/. "$NIRI_DIR/"
+    echo "niri:      copied /etc/niri to $NIRI_DIR"
+fi
+
 if [ -f "$NIRI_INDEX" ]; then
     other="$(grep -lE '^\s*cursor\s*\{' "$NIRI_DIR"/config.kdl "$NIRI_DIR"/niri.d/*.kdl 2>/dev/null \
         | grep -vF "$NIRI_CURSOR" || true)"

@@ -15,7 +15,8 @@ binds {
     // Lock the screen (styled config in ../swaylock/config, which sets `daemonize`). The same config is also used by the swayidle
     // auto-lock in ./bin/lockscreen, spawned in niri.d/50-startup.kdl.
     // Skipped while presentation mode is on, same as the idle auto-lock.
-    Mod+Shift+Escape hotkey-overlay-title="Lock the Screen: swaylock" { spawn-sh "[ \"$(xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/presentation-mode)\" != true ] && swaylock -C /etc/niri/swaylock/config"; }
+    // The user's swaylock config wins, the packaged one in /etc/niri is the fallback.
+    Mod+Shift+Escape hotkey-overlay-title="Lock the Screen: swaylock" { spawn-sh "[ \"$(xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/presentation-mode)\" != true ] || exit 0; c=\"${XDG_CONFIG_HOME:-$HOME/.config}/niri/swaylock/config\"; [ -f \"$c\" ] || c=/etc/niri/swaylock/config; swaylock -C \"$c\""; }
 
     Mod+E repeat=false hotkey-overlay-title="Thunar" { spawn-sh "thunar"; }
 

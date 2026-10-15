@@ -1,5 +1,8 @@
 #!/bin/sh
 
 if [ -z "$WAYLAND_DISPLAY" ] && [ -z "$NIRI_SOCKET" ]; then
+    # the Xfce settings launchers overridden for this session (installed by the
+    # package in /usr/share/xfce4-niri/applications) shadow the stock ones
+    export XDG_DATA_DIRS="/usr/share/xfce4-niri:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
     exec dbus-run-session -- niri --session
 fi
