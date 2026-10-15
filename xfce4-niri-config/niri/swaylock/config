@@ -23,7 +23,7 @@
 # Same wallpaper as swaybg (niri.d/50-startup.kdl) for a consistent look
 # between desktop and lock screen. #f5f6f7 is the theme's bg_color, used
 # as a fallback fill if the image cannot be loaded.
-image=/usr/local/share/backgrounds/002.jpg
+image=/usr/local/share/backgrounds/xfce4-niri/002.jpg
 scaling=fill
 color=#f5f6f7
 
