@@ -8,15 +8,21 @@ for cmd in swayidle swaylock; do
 done
 
 if [ -z "$1" ] || [ -z "$2" ]; then
-    loginctl lock-session $XDG_SESSION_ID
+    loginctl lock-session "$XDG_SESSION_ID"
     exit 0
 fi
 
+# the user's config wins, the packaged one in /etc/niri is the fallback
+SWAYLOCK_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/niri/swaylock/config"
+[ -f "$SWAYLOCK_CONF" ] || SWAYLOCK_CONF=/etc/niri/swaylock/config
+
+SWAYLOCK_CMD="swaylock -f -C '$SWAYLOCK_CONF'"
+
 swayidle -w \
-    timeout $1 "swaylock -f -C ~/.config/niri/swaylock/config" \
-    timeout $2 "niri msg action power-off-monitors" \
+    timeout "$1" "$SWAYLOCK_CMD" \
+    timeout "$2" "niri msg action power-off-monitors" \
     resume "niri msg action power-on-monitors" \
-    lock "swaylock -f -C ~/.config/niri/swaylock/config" \
-    before-sleep "swaylock -f -C ~/.config/niri/swaylock/config" &
+    lock "$SWAYLOCK_CMD" \
+    before-sleep "$SWAYLOCK_CMD" &
 
 sleep 1

@@ -5,3 +5,9 @@
 // WARNING
 // The display configuration it's handled by xfce4-display-settings 
 
+// Mode/scale/position are left to xfce4-display-settings; here we only mark
+// the laptop panel as the "primary" one: niri focuses it at startup, so new
+// windows land there even when external monitors are attached.
+output "eDP-1" {
+    focus-at-startup
+}

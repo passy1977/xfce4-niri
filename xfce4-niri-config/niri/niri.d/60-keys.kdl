@@ -8,14 +8,14 @@
 binds {
     Mod+Shift+O { show-hotkey-overlay; }
 
-    Mod+T hotkey-overlay-title="Open a Terminal: ghostty" { spawn "ghostty"; }
-    Mod+Return hotkey-overlay-title="Open a Terminal: ghostty" { spawn "ghostty"; }
+    Mod+T hotkey-overlay-title="Open a Terminal: xfce4-terminal" { spawn "xfce4-terminal"; }
+    Mod+Return hotkey-overlay-title="Open a Terminal: xfce4-terminal" { spawn "xfce4-terminal"; }
     Mod+Space hotkey-overlay-title="Run an Application: xfce4-appfinder" { spawn "xfce4-appfinder"; }
 
     // Lock the screen (styled config in ../swaylock/config, which sets `daemonize`). The same config is also used by the swayidle
     // auto-lock in ./bin/lockscreen, spawned in niri.d/50-startup.kdl.
     // Skipped while presentation mode is on, same as the idle auto-lock.
-    Mod+Shift+Escape hotkey-overlay-title="Lock the Screen: swaylock" { spawn-sh "[ \"$(xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/presentation-mode)\" != true ] && swaylock -C /home/antoniosalsi/.config/niri/swaylock/config"; }
+    Mod+Shift+Escape hotkey-overlay-title="Lock the Screen: swaylock" { spawn-sh "[ \"$(xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/presentation-mode)\" != true ] && swaylock -C /etc/niri/swaylock/config"; }
 
     Mod+E repeat=false hotkey-overlay-title="Thunar" { spawn-sh "thunar"; }
 

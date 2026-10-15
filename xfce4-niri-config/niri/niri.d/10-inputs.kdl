@@ -17,7 +17,7 @@ input {
         dwt
         dwtp
         // natural-scroll
-        disabled-on-external-mouse
+        // disabled-on-external-mouse
     }
 
     mouse {

@@ -38,6 +38,7 @@ static mut DATA: Option<Data> = None;
 pub(crate) const XDG_AUTOSTART: &str = "/etc/xdg/autostart";
 pub(crate) const LOCK_SCREEN_LOCAL_FILE: &str = "/usr/local/libexec/xfce4-niri/lock_screen";
 pub(crate) const LOCK_SCREEN_GLOBAL_FILE: &str = "/usr/libexec/xfce4-niri/lock_screen";
+// pub(crate) const NIRI_GLOBAL_CONFIG: &str = "/etc/niri";
 
 macro_rules! get_env_full_path {
     ($home:expr, $env_var:literal, $real_path:literal) => {{
@@ -55,7 +56,7 @@ macro_rules! get_env_full_path {
 #[derive(Default, Clone)]
 pub(crate) struct Data {
     #[allow(dead_code)]
-    // pub(crate) niri_file: String,
+    // pub(crate) niri_config: String,
     pub(crate) xdg_home_autostart: String,
     pub(crate) brightness_file: String,
     pub(crate) lock_screen_file: String,
@@ -97,8 +98,8 @@ impl Data {
                 let config = get_env_full_path!(home, "XDG_CONFIG_HOME", "/.config");
                 let state = get_env_full_path!(home, "XDG_STATE_HOME", "/.local/state");
 
-                // let mut niri_file = config.clone();
-                // niri_file.push_str("niri/config.kdl");
+                // let mut niri_config = config.clone();
+                // niri_config.push_str("niri");
 
                 let mut xdg_home_autostart = home.clone();
                 xdg_home_autostart.push_str("/.config/autostart");
@@ -110,7 +111,7 @@ impl Data {
                 lock_screen_file.push_str("niri/bin/lock_screen");
 
                 let data = Self { 
-                    // niri_file, 
+                    // niri_config,
                     xdg_home_autostart, 
                     brightness_file,
                     lock_screen_file
@@ -152,7 +153,6 @@ impl Data {
                 }
             }
         };
-
 
         let lock_screen_file;
         if Path::new(&self.lock_screen_file).exists() {
